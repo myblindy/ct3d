@@ -35,10 +35,10 @@ namespace ct3d.RenderPrimitives
                      (fi.FieldType == typeof(float) || fi.FieldType == typeof(Vector2) || fi.FieldType == typeof(Vector3) || fi.FieldType == typeof(Vector4) || fi.FieldType == typeof(Color4)
                          ? VertexAttribType.Float
                          : throw new NotImplementedException(), (int)Marshal.OffsetOf<TVertex>(fi.Name),
-                      fi.FieldType == typeof(float) ? 1 
-                        : fi.FieldType == typeof(Vector2) ? 2 
-                        : fi.FieldType == typeof(Vector3) ? 3 
-                        : fi.FieldType == typeof(Vector4) || fi.FieldType == typeof(Color4) ? 4 
+                      fi.FieldType == typeof(float) ? 1
+                        : fi.FieldType == typeof(Vector2) ? 2
+                        : fi.FieldType == typeof(Vector3) ? 3
+                        : fi.FieldType == typeof(Vector4) || fi.FieldType == typeof(Color4) ? 4
                         : throw new NotImplementedException()))
                     .ToArray();
 
@@ -46,21 +46,21 @@ namespace ct3d.RenderPrimitives
             }
         }
 
+        VertexTypeCacheType vertexTypeData;
+
         readonly int[] bufferObjects = new int[2];
         readonly int vertexArrayObject;
         private bool disposedValue;
 
-        public VertexIndexBuffer(TVertex[] vertices, TIndex[] indices)
+        public int VertexCount { get; }
+        public int IndexCount { get; }
+
+        public unsafe VertexIndexBuffer(TVertex[] vertices, TIndex[] indices)
         {
+            vertexTypeData = VertexTypeData;
             GL.CreateBuffers(2, bufferObjects);
-
-            var vertexTypeData = VertexTypeData;
-            GL.NamedBufferStorage(bufferObjects[0], vertexTypeData.Size * vertices.Length, vertices, BufferStorageFlags.None);
-
-            unsafe
-            {
-                GL.NamedBufferStorage(bufferObjects[1], sizeof(TIndex) * indices.Length, indices, BufferStorageFlags.None);
-            }
+            GL.NamedBufferStorage(bufferObjects[0], vertexTypeData.Size * (VertexCount = vertices.Length), vertices, BufferStorageFlags.DynamicStorageBit);
+            GL.NamedBufferStorage(bufferObjects[1], sizeof(TIndex) * (IndexCount = indices.Length), indices, BufferStorageFlags.DynamicStorageBit);
 
             GL.CreateVertexArrays(1, out vertexArrayObject);
             GL.VertexArrayVertexBuffer(vertexArrayObject, 0, bufferObjects[0], IntPtr.Zero, vertexTypeData.Size);
@@ -74,11 +74,13 @@ namespace ct3d.RenderPrimitives
             }
         }
 
-        public void DrawArrays(PrimitiveType primitiveType, int first, int count)
+        public unsafe void Update(TVertex[] vertices, TIndex[] indices)
         {
-            GL.BindVertexArray(vertexArrayObject);
-            GL.DrawArrays(primitiveType, first, count);
+            GL.NamedBufferSubData(bufferObjects[0], IntPtr.Zero, vertexTypeData.Size * vertices.Length, vertices);
+            GL.NamedBufferSubData(bufferObjects[1], IntPtr.Zero, sizeof(TIndex) * indices.Length, indices);
         }
+
+        public void Bind() => GL.BindVertexArray(vertexArrayObject);
 
         void Dispose(bool disposing)
         {

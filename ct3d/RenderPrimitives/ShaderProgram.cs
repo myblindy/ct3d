@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using OpenToolkit.Graphics.OpenGL4;
+using OpenToolkit.Mathematics;
 
 namespace ct3d.RenderPrimitives
 {
@@ -12,6 +13,7 @@ namespace ct3d.RenderPrimitives
     {
         const string PathPrefix = "Shaders";
         readonly int programObject;
+        readonly Dictionary<string, int> uniforms = new Dictionary<string, int>();
         private bool disposedValue;
 
         public ShaderProgram(string commonShaderPath) : this(commonShaderPath + ".vert", commonShaderPath + ".frag") { }
@@ -44,7 +46,18 @@ namespace ct3d.RenderPrimitives
             GL.DetachShader(programObject, fragmentShader);
             GL.DeleteShader(vertexShader);
             GL.DeleteShader(fragmentShader);
+
+            // get uniform names
+            GL.GetProgram(programObject, GetProgramParameterName.ActiveUniforms, out int uniformCount);
+            for (int idx = 0; idx < uniformCount; ++idx)
+            {
+                GL.GetActiveUniformName(programObject, idx, 60, out _, out var name);
+                uniforms[name] = GL.GetUniformLocation(programObject, name);
+            }
         }
+
+        internal void ProgramUniform(string name, ref Matrix4 mat) =>
+            GL.ProgramUniformMatrix4(programObject, uniforms[name], false, ref mat);
 
         public void Use() => GL.UseProgram(programObject);
 

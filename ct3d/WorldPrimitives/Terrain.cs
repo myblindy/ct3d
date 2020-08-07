@@ -17,7 +17,22 @@ namespace ct3d.WorldPrimitives
         public int Width { get; }
         public int Height { get; }
 
-        readonly ShaderProgram shader = new ShaderProgram("terrain");
+        public bool Dirty { get; set; } = true;
+
+        private ShaderProgram TerrainShader { get; } = new ShaderProgram("terrain");
+        private ShaderProgram GridShader { get; } = new ShaderProgram("terrain.grid");
+
+        public void SetWorldMatrix(ref Matrix4 camera)
+        {
+            TerrainShader.ProgramUniform("world", ref camera);
+            GridShader.ProgramUniform("world", ref camera);
+        }
+
+        public void SetProjectionMatrix(ref Matrix4 projection)
+        {
+            TerrainShader.ProgramUniform("projection", ref projection);
+            GridShader.ProgramUniform("projection", ref projection);
+        }
 
         [StructLayout(LayoutKind.Sequential, Pack = 1)]
         struct Vertex
@@ -25,33 +40,91 @@ namespace ct3d.WorldPrimitives
             public Vector3 Position, Normal;
             public Color4 Color;
         }
-        readonly VertexIndexBuffer<Vertex, ushort> vertexIndexBuffer;
+        VertexIndexBuffer<Vertex, ushort> vertexIndexBuffer;
 
         private bool disposedValue;
+
+        unsafe (Vertex[], ushort[]) BuildTerrainVertices(Range xRange, Range yRange)
+        {
+            var vertices = new Vertex[(xRange.End.Value - xRange.Start.Value) * (yRange.End.Value - yRange.Start.Value) * 6];
+            var indices = new ushort[
+                2 * (xRange.End.Value - xRange.Start.Value) * (yRange.End.Value - yRange.Start.Value - 1) +
+                2 * (xRange.End.Value - xRange.Start.Value - 1) * (yRange.End.Value - yRange.Start.Value)];
+
+            fixed (Vertex* firstVertex = vertices)
+            fixed (ushort* firstIndex = indices)
+            {
+                var vertex = firstVertex;
+                var index = firstIndex;
+
+                for (int x = xRange.Start.Value; x < xRange.End.Value - 1; ++x)
+                    for (int y = yRange.Start.Value; y < yRange.End.Value - 1; ++y)
+                    {
+                        var x0 = x - xRange.Start.Value;
+                        var y0 = y - yRange.Start.Value;
+                        var color = Color4.Green;
+
+                        static float transformHeight(byte heightValue) => heightValue / 4f;
+                        float zXY = transformHeight(this[x, y]);
+                        float zX1Y1 = transformHeight(this[x + 1, y + 1]);
+
+                        // the 2 triangles that compose each quad of ground
+                        *vertex++ = new Vertex { Position = new Vector3(x0, y0, zXY), Color = color };
+                        *vertex++ = new Vertex { Position = new Vector3(x0 + 1, y0, transformHeight(this[x + 1, y])), Color = color };
+                        *vertex++ = new Vertex { Position = new Vector3(x0 + 1, y0 + 1, zX1Y1), Color = color };
+
+                        *vertex++ = new Vertex { Position = new Vector3(x0, y0, zXY), Color = color };
+                        *vertex++ = new Vertex { Position = new Vector3(x0 + 1, y0 + 1, zX1Y1), Color = color };
+                        *vertex++ = new Vertex { Position = new Vector3(x0, y0 + 1, transformHeight(this[x, y + 1])), Color = color };
+
+                        // use the index buffer to draw the grid lines with the vertices above
+                        if (y0 > 0)
+                        {
+                            *index++ = (ushort)(vertex - firstVertex - 6);
+                            *index++ = (ushort)(vertex - firstVertex - 5);
+                        }
+
+                        if (x0 > 0)
+                        {
+                            *index++ = (ushort)(vertex - firstVertex - 6);
+                            *index++ = (ushort)(vertex - firstVertex - 1);
+                        }
+                    }
+            }
+
+            return (vertices, indices);
+        }
 
         public Terrain(int w, int h)
         {
             (Width, Height, heightMap) = (w, h, new byte[w * h]);
-
-            vertexIndexBuffer = new VertexIndexBuffer<Vertex, ushort>(new[]
-            {
-                new Vertex { Position = new Vector3(0, 1, -2), Normal = new Vector3(0, 0, -1), Color = Color4.Red },
-                new Vertex { Position = new Vector3(-1, 0, -2), Normal = new Vector3(0, 0, -1), Color = Color4.Green },
-                new Vertex { Position = new Vector3(1, 0, -2), Normal = new Vector3(0, 0, -1), Color = Color4.Blue },
-            }, new ushort[] { 0, 1, 2 });
         }
 
         public byte this[int x, int y]
         {
             get => heightMap[x * Width + y];
-            set => heightMap[x * Width + y] = value;
+            set { heightMap[x * Width + y] = value; Dirty = true; }
         }
 
         public void Render()
         {
-            shader.Use();
-            vertexIndexBuffer.DrawArrays(PrimitiveType.Triangles, 0, 3);
+            if (Dirty)
+            {
+                var (vertices, indices) = BuildTerrainVertices(0..5, 0..5);
+                if (vertexIndexBuffer is null)
+                    vertexIndexBuffer = new VertexIndexBuffer<Vertex, ushort>(vertices, indices);
+                else
+                    vertexIndexBuffer.Update(vertices, indices);
 
+                Dirty = false;
+            }
+
+            TerrainShader.Use();
+            vertexIndexBuffer.Bind();
+            GL.DrawArrays(PrimitiveType.Triangles, 0, vertexIndexBuffer.VertexCount);
+
+            GridShader.Use();
+            GL.DrawElements(BeginMode.Lines, vertexIndexBuffer.IndexCount, DrawElementsType.UnsignedShort, 0);
         }
 
         void Dispose(bool disposing)
@@ -64,8 +137,9 @@ namespace ct3d.WorldPrimitives
                 }
 
                 // unmanaged objects
-                shader.Dispose();
-                vertexIndexBuffer.Dispose();
+                TerrainShader.Dispose();
+                GridShader.Dispose();
+                vertexIndexBuffer?.Dispose();
 
                 disposedValue = true;
             }
