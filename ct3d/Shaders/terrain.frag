@@ -2,8 +2,7 @@
 
 uniform int selectedPrimitiveID;
 
-in vec4 fNormal;
-in vec4 fColor;
+flat in vec4 fColor;
 
 out vec4 outputColor;
 

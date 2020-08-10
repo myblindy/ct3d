@@ -48,6 +48,8 @@ namespace ct3d.WorldPrimitives
 
         private bool disposedValue;
 
+        static readonly Color4 grassColor = Color4.Lime;
+
         unsafe (Vertex[], ushort[]) BuildTerrainVertices(Range xRange, Range yRange)
         {
             var vertices = new Vertex[(xRange.End.Value - xRange.Start.Value) * (yRange.End.Value - yRange.Start.Value) * 6];
@@ -66,20 +68,27 @@ namespace ct3d.WorldPrimitives
                     {
                         var x0 = x - xRange.Start.Value;
                         var y0 = y - yRange.Start.Value;
-                        var color = Color4.Green;
 
-                        static float transformHeight(byte heightValue) => heightValue / 4f;
+                        static float transformHeight(byte heightValue) => heightValue / 3f;
                         float zXY = transformHeight(this[x, y]);
                         float zX1Y1 = transformHeight(this[x + 1, y + 1]);
 
                         // the 2 triangles that compose each quad of ground
-                        *vertex++ = new Vertex { Position = new Vector3(x0, y0, zXY), Color = color };
-                        *vertex++ = new Vertex { Position = new Vector3(x0 + 1, y0, transformHeight(this[x + 1, y])), Color = color };
-                        *vertex++ = new Vertex { Position = new Vector3(x0 + 1, y0 + 1, zX1Y1), Color = color };
+                        Vector3 vx0y0 = new Vector3(x0, y0, zXY);
+                        Vector3 vx01y0 = new Vector3(x0 + 1, y0, transformHeight(this[x + 1, y]));
+                        Vector3 vx01y01 = new Vector3(x0 + 1, y0 + 1, zX1Y1);
 
-                        *vertex++ = new Vertex { Position = new Vector3(x0, y0, zXY), Color = color };
-                        *vertex++ = new Vertex { Position = new Vector3(x0 + 1, y0 + 1, zX1Y1), Color = color };
-                        *vertex++ = new Vertex { Position = new Vector3(x0, y0 + 1, transformHeight(this[x, y + 1])), Color = color };
+                        var normal = Vector3.Normalize(Vector3.Cross(vx01y0 - vx0y0, vx01y01 - vx0y0));
+                        *vertex++ = new Vertex { Position = vx0y0, Color = grassColor, Normal = normal };
+                        *vertex++ = new Vertex { Position = vx01y0, Color = grassColor, Normal = normal };
+                        *vertex++ = new Vertex { Position = vx01y01, Color = grassColor, Normal = normal };
+
+                        Vector3 vx0y01 = new Vector3(x0, y0 + 1, transformHeight(this[x, y + 1]));
+                        Vector3.Cross(vx01y01 - vx0y0, vx0y01 - vx0y0, out normal);
+                        normal = Vector3.Normalize(normal);
+                        *vertex++ = new Vertex { Position = vx0y0, Color = grassColor, Normal = normal };
+                        *vertex++ = new Vertex { Position = vx01y01, Color = grassColor, Normal = normal };
+                        *vertex++ = new Vertex { Position = vx0y01, Color = grassColor, Normal = normal };
 
                         // use the index buffer to draw the grid lines with the vertices above
                         if (y0 > 0)
@@ -115,7 +124,7 @@ namespace ct3d.WorldPrimitives
         {
             if (Dirty)
             {
-                var (vertices, indices) = BuildTerrainVertices(0..5, 0..5);
+                var (vertices, indices) = BuildTerrainVertices(0..10, 0..10);
                 if (vertexIndexBuffer is null)
                     vertexIndexBuffer = new VertexIndexBuffer<Vertex, ushort>(vertices, indices);
                 else

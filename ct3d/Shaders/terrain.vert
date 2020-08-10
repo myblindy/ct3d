@@ -4,15 +4,15 @@ layout(location = 0) uniform mat4 projection;
 layout(location = 4) uniform mat4 world;
 
 layout(location = 0) in vec3 vPosition;
-layout(location = 1) in vec3 vNormal;
+layout(location = 0) in vec3 fNormal;
 layout(location = 2) in vec4 vColor;
 
-out vec3 fNormal;
-out vec4 fColor;
+flat out vec4 fColor;
+
+const vec3 sunDirection = vec3(0, 0, 1);
 
 void main(void)
 {
     gl_Position = projection * world * vec4(vPosition, 1);
-    fNormal = vNormal;
-    fColor = vColor;
+    fColor = (1 - max(dot(sunDirection, fNormal), 0)) * vColor;
 }

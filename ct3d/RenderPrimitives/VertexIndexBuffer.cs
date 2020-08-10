@@ -76,6 +76,8 @@ namespace ct3d.RenderPrimitives
 
         public unsafe void Update(TVertex[] vertices, TIndex[] indices)
         {
+            if (vertices.Length != VertexCount || indices.Length != IndexCount) throw new InvalidOperationException();
+
             GL.NamedBufferSubData(bufferObjects[0], IntPtr.Zero, vertexTypeData.Size * vertices.Length, vertices);
             GL.NamedBufferSubData(bufferObjects[1], IntPtr.Zero, sizeof(TIndex) * indices.Length, indices);
         }

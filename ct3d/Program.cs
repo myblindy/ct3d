@@ -51,12 +51,13 @@ namespace ct3d
             GL.ClearColor(Color4.Aqua);
 
             var rng = new Random();
-            terrain = new Terrain(5, 5, gameState);
-            for (int y = 0; y < terrain.Height; ++y)
-                for (int x = 0; x < terrain.Width; ++x)
-                    terrain[x, y] = (byte)rng.Next(4);
+            terrain = new Terrain(10, 20, gameState);
+            //for (int y = 0; y < terrain.Height; ++y)
+            //    for (int x = 0; x < terrain.Width; ++x)
+            //        terrain[x, y] = (byte)rng.Next(4);
+            terrain[2, 2] = 1;
 
-            var camera = Matrix4.LookAt(0, -2, 5, 0, 5, 0, 0, 0, 1);
+            var camera = Matrix4.LookAt(5, -2, 5, 5, 5, 0, 0, 0, 1);
             terrain.SetWorldMatrix(ref camera);
         }
 
@@ -67,7 +68,7 @@ namespace ct3d
             GL.Viewport(0, 0, e.Width, e.Height);
 
             // set up the projection matrix
-            var projection = Matrix4.CreatePerspectiveFieldOfView(MathF.PI / 2, (float)Size.Y / Size.X, 0.1f, 10f);
+            var projection = Matrix4.CreatePerspectiveFieldOfView(MathF.PI / 2, (float)Size.Y / Size.X, 0.1f, 20f);
             terrain.SetProjectionMatrix(ref projection);
         }
 
