@@ -25,6 +25,8 @@
   <ItemGroup>
     <None Remove="Shaders\terrain.grid.frag" />
     <None Remove="Shaders\terrain.grid.vert" />
+    <None Remove="Shaders\terrain.pick.frag" />
+    <None Remove="Shaders\terrain.pick.vert" />
   </ItemGroup>
 
 </Project>

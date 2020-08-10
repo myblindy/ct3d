@@ -13,25 +13,29 @@ namespace ct3d.WorldPrimitives
     sealed class Terrain : IDisposable
     {
         readonly byte[] heightMap;
+        readonly GameState gameState;
 
         public int Width { get; }
         public int Height { get; }
 
         public bool Dirty { get; set; } = true;
 
-        private ShaderProgram TerrainShader { get; } = new ShaderProgram("terrain");
-        private ShaderProgram GridShader { get; } = new ShaderProgram("terrain.grid");
+        private readonly ShaderProgram terrainShader = new ShaderProgram("terrain");
+        private readonly ShaderProgram gridShader = new ShaderProgram("terrain.grid");
+        private readonly PickingBuffer pickingBuffer;
 
         public void SetWorldMatrix(ref Matrix4 camera)
         {
-            TerrainShader.ProgramUniform("world", ref camera);
-            GridShader.ProgramUniform("world", ref camera);
+            terrainShader.ProgramUniform("world", ref camera);
+            gridShader.ProgramUniform("world", ref camera);
+            pickingBuffer.Shader.ProgramUniform("world", ref camera);
         }
 
         public void SetProjectionMatrix(ref Matrix4 projection)
         {
-            TerrainShader.ProgramUniform("projection", ref projection);
-            GridShader.ProgramUniform("projection", ref projection);
+            terrainShader.ProgramUniform("projection", ref projection);
+            gridShader.ProgramUniform("projection", ref projection);
+            pickingBuffer.Shader.ProgramUniform("projection", ref projection);
         }
 
         [StructLayout(LayoutKind.Sequential, Pack = 1)]
@@ -95,9 +99,10 @@ namespace ct3d.WorldPrimitives
             return (vertices, indices);
         }
 
-        public Terrain(int w, int h)
+        public Terrain(int w, int h, GameState gameState)
         {
-            (Width, Height, heightMap) = (w, h, new byte[w * h]);
+            (Width, Height, heightMap, this.gameState) = (w, h, new byte[w * h], gameState);
+            pickingBuffer = new PickingBuffer("terrain.pick", gameState.WindowSize.X, gameState.WindowSize.Y);
         }
 
         public byte this[int x, int y]
@@ -119,11 +124,22 @@ namespace ct3d.WorldPrimitives
                 Dirty = false;
             }
 
-            TerrainShader.Use();
             vertexIndexBuffer.Bind();
+
+            // pass 1, render to a picking texture
+            pickingBuffer.TestPosition = new Vector2i((int)gameState.MousePosition.X, gameState.WindowSize.Y - (int)gameState.MousePosition.Y);
+            pickingBuffer.Bind();
+            GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
+            GL.DrawArrays(PrimitiveType.Triangles, 0, vertexIndexBuffer.VertexCount);
+            pickingBuffer.UnbindAndProcess();
+
+            // pass 2, render the terrain 
+            terrainShader.ProgramUniform("selectedPrimitiveID", pickingBuffer.SelectedPrimitiveID);
+            terrainShader.Use();
             GL.DrawArrays(PrimitiveType.Triangles, 0, vertexIndexBuffer.VertexCount);
 
-            GridShader.Use();
+            // pass 3, render the grid
+            gridShader.Use();
             GL.DrawElements(BeginMode.Lines, vertexIndexBuffer.IndexCount, DrawElementsType.UnsignedShort, 0);
         }
 
@@ -137,9 +153,10 @@ namespace ct3d.WorldPrimitives
                 }
 
                 // unmanaged objects
-                TerrainShader.Dispose();
-                GridShader.Dispose();
+                terrainShader.Dispose();
+                gridShader.Dispose();
                 vertexIndexBuffer?.Dispose();
+                pickingBuffer.Dispose();
 
                 disposedValue = true;
             }

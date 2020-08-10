@@ -59,6 +59,9 @@ namespace ct3d.RenderPrimitives
         internal void ProgramUniform(string name, ref Matrix4 mat) =>
             GL.ProgramUniformMatrix4(programObject, uniforms[name], false, ref mat);
 
+        internal void ProgramUniform(string name, uint val) =>
+            GL.ProgramUniform1(programObject, uniforms[name], (int)val);
+
         public void Use() => GL.UseProgram(programObject);
 
         private void Dispose(bool disposing)

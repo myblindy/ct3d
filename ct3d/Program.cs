@@ -31,26 +31,27 @@ namespace ct3d
         {
         }
 
+        readonly GameState gameState = new GameState();
         Terrain terrain;
 
-        protected override void OnLoad()
+        protected unsafe override void OnLoad()
         {
+            gameState.WindowSize = Size;
+
             MakeCurrent();
 
             // enable debug messages
             GL.Enable(EnableCap.DebugOutput);
             GL.Enable(EnableCap.DebugOutputSynchronous);
-            unsafe
-            {
-                GL.DebugMessageCallback((src, type, id, severity, len, msg, usr) =>
-                    Console.WriteLine($"GL ERROR {Encoding.ASCII.GetString((byte*)msg, len)}, type: {type}, severity: {severity}, source: {src}"), IntPtr.Zero);
-            }
+
+            GL.DebugMessageCallback((src, type, id, severity, len, msg, usr) =>
+                Console.WriteLine($"GL ERROR {Encoding.ASCII.GetString((byte*)msg, len)}, type: {type}, severity: {severity}, source: {src}"), IntPtr.Zero);
 
             GL.Enable(EnableCap.DepthTest);
             GL.ClearColor(Color4.Aqua);
 
             var rng = new Random();
-            terrain = new Terrain(5, 5);
+            terrain = new Terrain(5, 5, gameState);
             for (int y = 0; y < terrain.Height; ++y)
                 for (int x = 0; x < terrain.Width; ++x)
                     terrain[x, y] = (byte)rng.Next(4);
@@ -61,11 +62,18 @@ namespace ct3d
 
         protected override void OnResize(ResizeEventArgs e)
         {
+            gameState.WindowSize = e.Size;
+
             GL.Viewport(0, 0, e.Width, e.Height);
 
             // set up the projection matrix
             var projection = Matrix4.CreatePerspectiveFieldOfView(MathF.PI / 2, (float)Size.Y / Size.X, 0.1f, 10f);
             terrain.SetProjectionMatrix(ref projection);
+        }
+
+        protected override void OnMouseMove(MouseMoveEventArgs e)
+        {
+            gameState.MousePosition = e.Position;
         }
 
         protected override void OnUpdateFrame(FrameEventArgs args)
