@@ -1,7 +1,10 @@
-﻿#version 460
+﻿#version 460 core
 
-layout(location = 0) uniform mat4 projection;
-layout(location = 4) uniform mat4 world;
+layout(std140) uniform ViewMatrices
+{
+    mat4 projection;
+    mat4 world;
+};
 
 layout(location = 0) in vec3 vPosition;
 layout(location = 1) in vec3 vNormal;

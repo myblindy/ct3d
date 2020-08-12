@@ -4,6 +4,9 @@ using OpenToolkit.Mathematics;
 using OpenToolkit.Windowing.Common;
 using OpenToolkit.Windowing.Desktop;
 using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Linq;
 using System.Text;
 
 namespace ct3d
@@ -26,39 +29,40 @@ namespace ct3d
                 StartVisible = true,
                 Size = new Vector2i(800, 600),
                 Title = "Shitty TTD Clone",
-                Flags = ContextFlags.ForwardCompatible
+                Flags = ContextFlags.ForwardCompatible,
             })
         {
         }
 
-        readonly GameState gameState = new GameState();
+        GameState gameState;
         Terrain terrain;
 
         protected unsafe override void OnLoad()
         {
-            gameState.WindowSize = Size;
-
             MakeCurrent();
+
+            gameState = new GameState { WindowSize = Size };
+
+            VSync = VSyncMode.Off;
 
             // enable debug messages
             GL.Enable(EnableCap.DebugOutput);
             GL.Enable(EnableCap.DebugOutputSynchronous);
 
             GL.DebugMessageCallback((src, type, id, severity, len, msg, usr) =>
-                Console.WriteLine($"GL ERROR {Encoding.ASCII.GetString((byte*)msg, len)}, type: {type}, severity: {severity}, source: {src}"), IntPtr.Zero);
+            {
+                if (severity > DebugSeverity.DebugSeverityNotification)
+                    Console.WriteLine($"GL ERROR {Encoding.ASCII.GetString((byte*)msg, len)}, type: {type}, severity: {severity}, source: {src}");
+            }, IntPtr.Zero);
 
             GL.Enable(EnableCap.DepthTest);
             GL.ClearColor(Color4.Aqua);
 
             var rng = new Random();
-            terrain = new Terrain(10, 20, gameState);
-            //for (int y = 0; y < terrain.Height; ++y)
-            //    for (int x = 0; x < terrain.Width; ++x)
-            //        terrain[x, y] = (byte)rng.Next(4);
-            terrain[2, 2] = 1;
+            terrain = new Terrain(200, 200, gameState);
+            terrain[1, 1] = terrain[1, 2] = terrain[2, 1] = terrain[2, 2] = 1;
 
-            var camera = Matrix4.LookAt(5, -2, 5, 5, 5, 0, 0, 0, 1);
-            terrain.SetWorldMatrix(ref camera);
+            gameState.ProjectionWorldUniformBufferObject.Value.World = Matrix4.LookAt(2, -2, 5, 2, 5, 0, 0, 0, 1);
         }
 
         protected override void OnResize(ResizeEventArgs e)
@@ -68,8 +72,8 @@ namespace ct3d
             GL.Viewport(0, 0, e.Width, e.Height);
 
             // set up the projection matrix
-            var projection = Matrix4.CreatePerspectiveFieldOfView(MathF.PI / 2, (float)Size.Y / Size.X, 0.1f, 20f);
-            terrain.SetProjectionMatrix(ref projection);
+            gameState.ProjectionWorldUniformBufferObject.Value.Projection = Matrix4.CreatePerspectiveFieldOfView(MathF.PI / 2, (float)Size.Y / Size.X, 0.1f, 20f);
+            gameState.ProjectionWorldUniformBufferObject.Upload();
         }
 
         protected override void OnMouseMove(MouseMoveEventArgs e)
@@ -81,18 +85,30 @@ namespace ct3d
         {
         }
 
+        readonly Stopwatch stopwatch = Stopwatch.StartNew();
+        readonly List<double> frameTimesMs = new List<double>();
+
         protected override void OnRenderFrame(FrameEventArgs args)
         {
             GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
 
+            var start = stopwatch.Elapsed;
             terrain.Render();
 
             SwapBuffers();
+
+            frameTimesMs.Add((stopwatch.Elapsed - start).TotalMilliseconds);
+            if (frameTimesMs.Count > 150)
+            {
+                Console.WriteLine($"Average frame times: {frameTimesMs.Average()}ms, max frame time: {frameTimesMs.Max()}ms");
+                frameTimesMs.Clear();
+            }
         }
 
         protected override void OnUnload()
         {
             terrain.Dispose();
+            gameState.Dispose();
             base.OnUnload();
         }
 

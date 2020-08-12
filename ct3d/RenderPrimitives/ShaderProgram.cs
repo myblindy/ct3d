@@ -56,6 +56,13 @@ namespace ct3d.RenderPrimitives
             }
         }
 
+        public void BindUniformBlock<T>(string name, int bindingIndex, UniformBufferObject<T> buffer) where T : unmanaged
+        {
+            var idx = GL.GetUniformBlockIndex(programObject, name);
+            GL.UniformBlockBinding(programObject, idx, bindingIndex);
+            buffer.Bind(bindingIndex);
+        }
+
         internal void ProgramUniform(string name, ref Matrix4 mat) =>
             GL.ProgramUniformMatrix4(programObject, uniforms[name], false, ref mat);
 

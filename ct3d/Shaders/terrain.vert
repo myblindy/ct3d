@@ -1,10 +1,13 @@
-﻿#version 460
+﻿#version 460 core
 
-layout(location = 0) uniform mat4 projection;
-layout(location = 4) uniform mat4 world;
+layout(std140) uniform ViewMatrices
+{
+    mat4 projection;
+    mat4 world;
+};
 
 layout(location = 0) in vec3 vPosition;
-layout(location = 0) in vec3 fNormal;
+layout(location = 1) in vec3 vNormal;
 layout(location = 2) in vec4 vColor;
 
 flat out vec4 fColor;
@@ -14,5 +17,8 @@ const vec3 sunDirection = vec3(0, 0, 1);
 void main(void)
 {
     gl_Position = projection * world * vec4(vPosition, 1);
-    fColor = (1 - max(dot(sunDirection, fNormal), 0)) * vColor;
+
+    float lightStrength = max(0, dot(sunDirection, vNormal));
+    lightStrength = lightStrength * lightStrength * lightStrength * lightStrength * lightStrength;
+    fColor = lightStrength * vColor;
 }

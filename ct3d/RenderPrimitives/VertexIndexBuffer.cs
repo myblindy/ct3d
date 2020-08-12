@@ -70,7 +70,7 @@ namespace ct3d.RenderPrimitives
             {
                 GL.EnableVertexArrayAttrib(vertexArrayObject, idx);
                 GL.VertexArrayAttribFormat(vertexArrayObject, idx, vertexTypeData.PerFieldData[idx].size, VertexAttribType.Float, false, vertexTypeData.PerFieldData[idx].offset);
-                GL.VertexArrayAttribBinding(vertexArrayObject, 2, 0);
+                GL.VertexArrayAttribBinding(vertexArrayObject, idx, 0);
             }
         }
 

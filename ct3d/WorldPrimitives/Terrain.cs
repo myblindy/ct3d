@@ -24,20 +24,6 @@ namespace ct3d.WorldPrimitives
         private readonly ShaderProgram gridShader = new ShaderProgram("terrain.grid");
         private readonly PickingBuffer pickingBuffer;
 
-        public void SetWorldMatrix(ref Matrix4 camera)
-        {
-            terrainShader.ProgramUniform("world", ref camera);
-            gridShader.ProgramUniform("world", ref camera);
-            pickingBuffer.Shader.ProgramUniform("world", ref camera);
-        }
-
-        public void SetProjectionMatrix(ref Matrix4 projection)
-        {
-            terrainShader.ProgramUniform("projection", ref projection);
-            gridShader.ProgramUniform("projection", ref projection);
-            pickingBuffer.Shader.ProgramUniform("projection", ref projection);
-        }
-
         [StructLayout(LayoutKind.Sequential, Pack = 1)]
         struct Vertex
         {
@@ -77,30 +63,61 @@ namespace ct3d.WorldPrimitives
                         Vector3 vx0y0 = new Vector3(x0, y0, zXY);
                         Vector3 vx01y0 = new Vector3(x0 + 1, y0, transformHeight(this[x + 1, y]));
                         Vector3 vx01y01 = new Vector3(x0 + 1, y0 + 1, zX1Y1);
-
-                        var normal = Vector3.Normalize(Vector3.Cross(vx01y0 - vx0y0, vx01y01 - vx0y0));
-                        *vertex++ = new Vertex { Position = vx0y0, Color = grassColor, Normal = normal };
-                        *vertex++ = new Vertex { Position = vx01y0, Color = grassColor, Normal = normal };
-                        *vertex++ = new Vertex { Position = vx01y01, Color = grassColor, Normal = normal };
-
                         Vector3 vx0y01 = new Vector3(x0, y0 + 1, transformHeight(this[x, y + 1]));
-                        Vector3.Cross(vx01y01 - vx0y0, vx0y01 - vx0y0, out normal);
-                        normal = Vector3.Normalize(normal);
-                        *vertex++ = new Vertex { Position = vx0y0, Color = grassColor, Normal = normal };
-                        *vertex++ = new Vertex { Position = vx01y01, Color = grassColor, Normal = normal };
-                        *vertex++ = new Vertex { Position = vx0y01, Color = grassColor, Normal = normal };
 
-                        // use the index buffer to draw the grid lines with the vertices above
-                        if (y0 > 0)
+                        // transpose the seam if needed
+                        if (vx0y0.Z == vx01y0.Z && vx0y0.Z == vx0y01.Z && vx0y0.Z != vx01y01.Z ||
+                            vx01y01.Z == vx01y0.Z && vx01y01.Z == vx0y01.Z && vx0y0.Z != vx01y01.Z)
                         {
-                            *index++ = (ushort)(vertex - firstVertex - 6);
-                            *index++ = (ushort)(vertex - firstVertex - 5);
+                            var normal = Vector3.Normalize(Vector3.Cross(vx0y0 - vx01y0, vx0y0 - vx0y01));
+                            *vertex++ = new Vertex { Position = vx0y0, Color = grassColor, Normal = normal };
+                            *vertex++ = new Vertex { Position = vx01y0, Color = grassColor, Normal = normal };
+                            *vertex++ = new Vertex { Position = vx0y01, Color = grassColor, Normal = normal };
+
+                            Vector3.Cross(vx01y0 - vx0y01, vx01y0 - vx01y01, out normal);
+                            normal = -Vector3.Normalize(normal);
+                            *vertex++ = new Vertex { Position = vx01y0, Color = grassColor, Normal = normal };
+                            *vertex++ = new Vertex { Position = vx0y01, Color = grassColor, Normal = normal };
+                            *vertex++ = new Vertex { Position = vx01y01, Color = grassColor, Normal = normal };
+
+                            // use the index buffer to draw the grid lines with the vertices above
+                            if (y0 > 0)
+                            {
+                                *index++ = (ushort)(vertex - firstVertex - 6);
+                                *index++ = (ushort)(vertex - firstVertex - 4);
+                            }
+
+                            if (x0 > 0)
+                            {
+                                *index++ = (ushort)(vertex - firstVertex - 6);
+                                *index++ = (ushort)(vertex - firstVertex - 5);
+                            }
                         }
-
-                        if (x0 > 0)
+                        else
                         {
-                            *index++ = (ushort)(vertex - firstVertex - 6);
-                            *index++ = (ushort)(vertex - firstVertex - 1);
+                            var normal = Vector3.Normalize(Vector3.Cross(vx01y0 - vx0y0, vx01y01 - vx0y0));
+                            *vertex++ = new Vertex { Position = vx0y0, Color = grassColor, Normal = normal };
+                            *vertex++ = new Vertex { Position = vx01y0, Color = grassColor, Normal = normal };
+                            *vertex++ = new Vertex { Position = vx01y01, Color = grassColor, Normal = normal };
+
+                            Vector3.Cross(vx01y01 - vx0y0, vx0y01 - vx0y0, out normal);
+                            normal = Vector3.Normalize(normal);
+                            *vertex++ = new Vertex { Position = vx0y0, Color = grassColor, Normal = normal };
+                            *vertex++ = new Vertex { Position = vx01y01, Color = grassColor, Normal = normal };
+                            *vertex++ = new Vertex { Position = vx0y01, Color = grassColor, Normal = normal };
+
+                            // use the index buffer to draw the grid lines with the vertices above
+                            if (y0 > 0)
+                            {
+                                *index++ = (ushort)(vertex - firstVertex - 6);
+                                *index++ = (ushort)(vertex - firstVertex - 5);
+                            }
+
+                            if (x0 > 0)
+                            {
+                                *index++ = (ushort)(vertex - firstVertex - 6);
+                                *index++ = (ushort)(vertex - firstVertex - 1);
+                            }
                         }
                     }
             }
@@ -111,7 +128,11 @@ namespace ct3d.WorldPrimitives
         public Terrain(int w, int h, GameState gameState)
         {
             (Width, Height, heightMap, this.gameState) = (w, h, new byte[w * h], gameState);
-            pickingBuffer = new PickingBuffer("terrain.pick", gameState.WindowSize.X, gameState.WindowSize.Y);
+            pickingBuffer = new PickingBuffer("terrain.pick", gameState.WindowSize.X, gameState.WindowSize.Y, buffersCount: 2);
+
+            terrainShader.BindUniformBlock("ViewMatrices", 0, gameState.ProjectionWorldUniformBufferObject);
+            gridShader.BindUniformBlock("ViewMatrices", 0, gameState.ProjectionWorldUniformBufferObject);
+            pickingBuffer.Shader.BindUniformBlock("ViewMatrices", 0, gameState.ProjectionWorldUniformBufferObject);
         }
 
         public byte this[int x, int y]
@@ -124,7 +145,7 @@ namespace ct3d.WorldPrimitives
         {
             if (Dirty)
             {
-                var (vertices, indices) = BuildTerrainVertices(0..10, 0..10);
+                var (vertices, indices) = BuildTerrainVertices(0..4, 0..4);
                 if (vertexIndexBuffer is null)
                     vertexIndexBuffer = new VertexIndexBuffer<Vertex, ushort>(vertices, indices);
                 else
