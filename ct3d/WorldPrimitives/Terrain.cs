@@ -12,13 +12,15 @@ namespace ct3d.WorldPrimitives
 {
     sealed class Terrain : IDisposable
     {
-        readonly byte[] heightMap;
+        readonly TerrainData[] heightMap;
         readonly GameState gameState;
 
         public int Width { get; }
         public int Height { get; }
 
         public bool Dirty { get; set; } = true;
+
+        private readonly Texture roadsTexture = new Texture("roads.png");
 
         private readonly ShaderProgram terrainShader = new ShaderProgram("terrain");
         private readonly ShaderProgram gridShader = new ShaderProgram("terrain.grid");
@@ -29,6 +31,8 @@ namespace ct3d.WorldPrimitives
         {
             public Vector3 Position, Normal;
             public Color4 Color;
+            public Vector2 UV;
+            public int RoadsIndex;
         }
         VertexIndexBuffer<Vertex, ushort> vertexIndexBuffer;
 
@@ -56,29 +60,33 @@ namespace ct3d.WorldPrimitives
                         var y0 = y - yRange.Start.Value;
 
                         static float transformHeight(byte heightValue) => heightValue / 3f;
-                        float zXY = transformHeight(this[x, y]);
-                        float zX1Y1 = transformHeight(this[x + 1, y + 1]);
+                        ref var terrainX0Y0 = ref this[x, y];
+                        var zXY = transformHeight(terrainX0Y0.Height);
+                        ref var terrainX1Y1 = ref this[x + 1, y + 1];
+                        var zX1Y1 = transformHeight(terrainX1Y1.Height);
 
                         // the 2 triangles that compose each quad of ground
-                        Vector3 vx0y0 = new Vector3(x0, y0, zXY);
-                        Vector3 vx01y0 = new Vector3(x0 + 1, y0, transformHeight(this[x + 1, y]));
-                        Vector3 vx01y01 = new Vector3(x0 + 1, y0 + 1, zX1Y1);
-                        Vector3 vx0y01 = new Vector3(x0, y0 + 1, transformHeight(this[x, y + 1]));
+                        var vx0y0 = new Vector3(x0, y0, zXY);
+                        ref var terrainX1Y0 = ref this[x + 1, y];
+                        var vx1y0 = new Vector3(x0 + 1, y0, transformHeight(terrainX1Y0.Height));
+                        var vx1y1 = new Vector3(x0 + 1, y0 + 1, zX1Y1);
+                        ref var terrainX0Y1 = ref this[x, y + 1];
+                        var vx0y1 = new Vector3(x0, y0 + 1, transformHeight(terrainX0Y1.Height));
 
                         // transpose the seam if needed
-                        if (vx0y0.Z == vx01y0.Z && vx0y0.Z == vx0y01.Z && vx0y0.Z != vx01y01.Z ||
-                            vx01y01.Z == vx01y0.Z && vx01y01.Z == vx0y01.Z && vx0y0.Z != vx01y01.Z)
+                        if (vx0y0.Z == vx1y0.Z && vx0y0.Z == vx0y1.Z && vx0y0.Z != vx1y1.Z ||
+                            vx1y1.Z == vx1y0.Z && vx1y1.Z == vx0y1.Z && vx0y0.Z != vx1y1.Z)
                         {
-                            var normal = Vector3.Normalize(Vector3.Cross(vx0y0 - vx01y0, vx0y0 - vx0y01));
-                            *vertex++ = new Vertex { Position = vx0y0, Color = grassColor, Normal = normal };
-                            *vertex++ = new Vertex { Position = vx01y0, Color = grassColor, Normal = normal };
-                            *vertex++ = new Vertex { Position = vx0y01, Color = grassColor, Normal = normal };
+                            var normal = Vector3.Normalize(Vector3.Cross(vx0y0 - vx1y0, vx0y0 - vx0y1));
+                            *vertex++ = new Vertex { Position = vx0y0, Color = grassColor, Normal = normal, RoadsIndex = (int)terrainX0Y0.RoadData, UV = new Vector2(0, 0) };
+                            *vertex++ = new Vertex { Position = vx1y0, Color = grassColor, Normal = normal, RoadsIndex = (int)terrainX0Y0.RoadData, UV = new Vector2(1, 0) };
+                            *vertex++ = new Vertex { Position = vx0y1, Color = grassColor, Normal = normal, RoadsIndex = (int)terrainX0Y0.RoadData, UV = new Vector2(0, 1) };
 
-                            Vector3.Cross(vx01y0 - vx0y01, vx01y0 - vx01y01, out normal);
+                            Vector3.Cross(vx1y0 - vx0y1, vx1y0 - vx1y1, out normal);
                             normal = -Vector3.Normalize(normal);
-                            *vertex++ = new Vertex { Position = vx01y0, Color = grassColor, Normal = normal };
-                            *vertex++ = new Vertex { Position = vx0y01, Color = grassColor, Normal = normal };
-                            *vertex++ = new Vertex { Position = vx01y01, Color = grassColor, Normal = normal };
+                            *vertex++ = new Vertex { Position = vx1y0, Color = grassColor, Normal = normal, RoadsIndex = (int)terrainX0Y0.RoadData, UV = new Vector2(1, 0) };
+                            *vertex++ = new Vertex { Position = vx0y1, Color = grassColor, Normal = normal, RoadsIndex = (int)terrainX0Y0.RoadData, UV = new Vector2(0, 1) };
+                            *vertex++ = new Vertex { Position = vx1y1, Color = grassColor, Normal = normal, RoadsIndex = (int)terrainX0Y0.RoadData, UV = new Vector2(1, 1) };
 
                             // use the index buffer to draw the grid lines with the vertices above
                             if (y0 > 0)
@@ -95,16 +103,16 @@ namespace ct3d.WorldPrimitives
                         }
                         else
                         {
-                            var normal = Vector3.Normalize(Vector3.Cross(vx01y0 - vx0y0, vx01y01 - vx0y0));
-                            *vertex++ = new Vertex { Position = vx0y0, Color = grassColor, Normal = normal };
-                            *vertex++ = new Vertex { Position = vx01y0, Color = grassColor, Normal = normal };
-                            *vertex++ = new Vertex { Position = vx01y01, Color = grassColor, Normal = normal };
+                            var normal = Vector3.Normalize(Vector3.Cross(vx1y0 - vx0y0, vx1y1 - vx0y0));
+                            *vertex++ = new Vertex { Position = vx0y0, Color = grassColor, Normal = normal, RoadsIndex = (int)terrainX0Y0.RoadData, UV = new Vector2(0, 0) };
+                            *vertex++ = new Vertex { Position = vx1y0, Color = grassColor, Normal = normal, RoadsIndex = (int)terrainX0Y0.RoadData, UV = new Vector2(1, 0) };
+                            *vertex++ = new Vertex { Position = vx1y1, Color = grassColor, Normal = normal, RoadsIndex = (int)terrainX0Y0.RoadData, UV = new Vector2(1, 1) };
 
-                            Vector3.Cross(vx01y01 - vx0y0, vx0y01 - vx0y0, out normal);
+                            Vector3.Cross(vx1y1 - vx0y0, vx0y1 - vx0y0, out normal);
                             normal = Vector3.Normalize(normal);
-                            *vertex++ = new Vertex { Position = vx0y0, Color = grassColor, Normal = normal };
-                            *vertex++ = new Vertex { Position = vx01y01, Color = grassColor, Normal = normal };
-                            *vertex++ = new Vertex { Position = vx0y01, Color = grassColor, Normal = normal };
+                            *vertex++ = new Vertex { Position = vx0y0, Color = grassColor, Normal = normal, RoadsIndex = (int)terrainX0Y0.RoadData, UV = new Vector2(0, 0) };
+                            *vertex++ = new Vertex { Position = vx1y1, Color = grassColor, Normal = normal, RoadsIndex = (int)terrainX0Y0.RoadData, UV = new Vector2(1, 1) };
+                            *vertex++ = new Vertex { Position = vx0y1, Color = grassColor, Normal = normal, RoadsIndex = (int)terrainX0Y0.RoadData, UV = new Vector2(0, 1) };
 
                             // use the index buffer to draw the grid lines with the vertices above
                             if (y0 > 0)
@@ -127,25 +135,23 @@ namespace ct3d.WorldPrimitives
 
         public Terrain(int w, int h, GameState gameState)
         {
-            (Width, Height, heightMap, this.gameState) = (w, h, new byte[w * h], gameState);
-            pickingBuffer = new PickingBuffer("terrain.pick", gameState.WindowSize.X, gameState.WindowSize.Y, buffersCount: 2);
+            (Width, Height, heightMap, this.gameState) = (w, h, new TerrainData[w * h], gameState);
+            pickingBuffer = new PickingBuffer("terrain.pick", gameState.WindowSize.X, gameState.WindowSize.Y);
 
             terrainShader.BindUniformBlock("ViewMatrices", 0, gameState.ProjectionWorldUniformBufferObject);
             gridShader.BindUniformBlock("ViewMatrices", 0, gameState.ProjectionWorldUniformBufferObject);
             pickingBuffer.Shader.BindUniformBlock("ViewMatrices", 0, gameState.ProjectionWorldUniformBufferObject);
         }
 
-        public byte this[int x, int y]
-        {
-            get => heightMap[x * Width + y];
-            set { heightMap[x * Width + y] = value; Dirty = true; }
-        }
+        public void SetHeight(int x, int y, byte height) { heightMap[x * Width + y].Height = height; Dirty = true; }
+        public void SetRoad(int x, int y, TerrainRoadData roadData) { heightMap[x * Width + y].RoadData = roadData; Dirty = true; }
+        public ref TerrainData this[int x, int y] => ref heightMap[x * Width + y];
 
         public void Render()
         {
             if (Dirty)
             {
-                var (vertices, indices) = BuildTerrainVertices(0..4, 0..4);
+                var (vertices, indices) = BuildTerrainVertices(0..6, 0..6);
                 if (vertexIndexBuffer is null)
                     vertexIndexBuffer = new VertexIndexBuffer<Vertex, ushort>(vertices, indices);
                 else
@@ -166,6 +172,7 @@ namespace ct3d.WorldPrimitives
             // pass 2, render the terrain 
             terrainShader.ProgramUniform("selectedPrimitiveID", pickingBuffer.SelectedPrimitiveID);
             terrainShader.Use();
+            roadsTexture.Bind();
             GL.DrawArrays(PrimitiveType.Triangles, 0, vertexIndexBuffer.VertexCount);
 
             // pass 3, render the grid
@@ -187,6 +194,7 @@ namespace ct3d.WorldPrimitives
                 gridShader.Dispose();
                 vertexIndexBuffer?.Dispose();
                 pickingBuffer.Dispose();
+                roadsTexture.Dispose();
 
                 disposedValue = true;
             }
@@ -205,4 +213,17 @@ namespace ct3d.WorldPrimitives
             GC.SuppressFinalize(this);
         }
     }
+
+    [Flags]
+    enum TerrainRoadData { Up = 1 << 0, Right = 1 << 1, Down = 1 << 2, Left = 1 << 3 }
+
+    [StructLayout(LayoutKind.Sequential, Pack = 1)]
+    internal struct TerrainData
+    {
+        public byte Height;
+        public TerrainRoadData RoadData { get => (TerrainRoadData)(info & 0xF); set => info = (byte)(info & 0xF0 | (byte)value); }
+
+        byte info;
+    }
+
 }

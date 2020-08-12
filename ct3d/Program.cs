@@ -60,7 +60,18 @@ namespace ct3d
 
             var rng = new Random();
             terrain = new Terrain(200, 200, gameState);
-            terrain[1, 1] = terrain[1, 2] = terrain[2, 1] = terrain[2, 2] = 1;
+            terrain.SetHeight(1, 1, 1);
+            terrain.SetHeight(1, 2, 1);
+            terrain.SetHeight(2, 1, 1);
+            terrain.SetHeight(2, 2, 1);
+
+            terrain.SetRoad(1, 1, TerrainRoadData.Down | TerrainRoadData.Right);
+            terrain.SetRoad(1, 0, TerrainRoadData.Up|TerrainRoadData.Down);
+            terrain.SetRoad(2, 1, TerrainRoadData.Left | TerrainRoadData.Right);
+            terrain.SetRoad(3, 1, TerrainRoadData.Left | TerrainRoadData.Up | TerrainRoadData.Down);
+            terrain.SetRoad(3, 2, TerrainRoadData.Down);
+            terrain.SetRoad(3, 0, TerrainRoadData.Up | TerrainRoadData.Right);
+            terrain.SetRoad(4, 0, TerrainRoadData.Left);
 
             gameState.ProjectionWorldUniformBufferObject.Value.World = Matrix4.LookAt(2, -2, 5, 2, 5, 0, 0, 0, 1);
         }

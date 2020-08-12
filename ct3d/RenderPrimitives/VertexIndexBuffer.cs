@@ -20,6 +20,26 @@ namespace ct3d.RenderPrimitives
         }
 
         static readonly Dictionary<Type, VertexTypeCacheType> vertexTypeCache = new Dictionary<Type, VertexTypeCacheType>();
+        static readonly Dictionary<Type, VertexAttribType> vertexAttribTypesCache = new Dictionary<Type, VertexAttribType>
+        {
+            [typeof(float)] = VertexAttribType.Float,
+            [typeof(Vector2)] = VertexAttribType.Float,
+            [typeof(Vector3)] = VertexAttribType.Float,
+            [typeof(Vector4)] = VertexAttribType.Float,
+            [typeof(Color4)] = VertexAttribType.Float,
+            [typeof(int)] = VertexAttribType.Int,
+            [typeof(uint)] = VertexAttribType.UnsignedInt,
+        };
+        static readonly Dictionary<Type, int> componentCountCache = new Dictionary<Type, int>
+        {
+            [typeof(float)] = 1,
+            [typeof(Vector2)] = 2,
+            [typeof(Vector3)] = 3,
+            [typeof(Vector4)] = 4,
+            [typeof(Color4)] = 4,
+            [typeof(int)] = 1,
+            [typeof(uint)] = 1,
+        };
 
         static VertexTypeCacheType VertexTypeData
         {
@@ -31,15 +51,8 @@ namespace ct3d.RenderPrimitives
 
                 // decode the type
                 data.Size = Marshal.SizeOf<TVertex>();
-                data.PerFieldData = vertexType.GetFields().Select(fi =>
-                     (fi.FieldType == typeof(float) || fi.FieldType == typeof(Vector2) || fi.FieldType == typeof(Vector3) || fi.FieldType == typeof(Vector4) || fi.FieldType == typeof(Color4)
-                         ? VertexAttribType.Float
-                         : throw new NotImplementedException(), (int)Marshal.OffsetOf<TVertex>(fi.Name),
-                      fi.FieldType == typeof(float) ? 1
-                        : fi.FieldType == typeof(Vector2) ? 2
-                        : fi.FieldType == typeof(Vector3) ? 3
-                        : fi.FieldType == typeof(Vector4) || fi.FieldType == typeof(Color4) ? 4
-                        : throw new NotImplementedException()))
+                data.PerFieldData = vertexType.GetFields()
+                    .Select(fi => (vertexAttribTypesCache[fi.FieldType], (int)Marshal.OffsetOf<TVertex>(fi.Name), componentCountCache[fi.FieldType]))
                     .ToArray();
 
                 return data;
