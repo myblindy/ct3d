@@ -16,7 +16,7 @@ namespace ct3d
             public Matrix4 World;
         }
 
-        public Vector2 MousePosition;
+        public Vector2 MousePosition, CameraPosition;
         public Vector2i WindowSize;
         public UniformBufferObject<ProjectionWorldUniformBufferObjectValueType> ProjectionWorldUniformBufferObject =
             new UniformBufferObject<ProjectionWorldUniformBufferObjectValueType>();

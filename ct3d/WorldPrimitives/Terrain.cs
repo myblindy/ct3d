@@ -20,9 +20,11 @@ namespace ct3d.WorldPrimitives
 
         public bool Dirty { get; set; } = true;
 
+        readonly int chunkSize;
+
         private readonly Texture roadsTexture = new Texture("roads.png");
 
-        private readonly ShaderProgram terrainShader = new ShaderProgram("terrain");
+        private readonly ShaderProgram terrainShader = new ShaderProgram("terrain.main");
         private readonly ShaderProgram gridShader = new ShaderProgram("terrain.grid");
         private readonly PickingBuffer pickingBuffer;
 
@@ -133,9 +135,9 @@ namespace ct3d.WorldPrimitives
             return (vertices, indices);
         }
 
-        public Terrain(int w, int h, GameState gameState)
+        public Terrain(int w, int h, int chunkSize, GameState gameState)
         {
-            (Width, Height, heightMap, this.gameState) = (w, h, new TerrainData[w * h], gameState);
+            (Width, Height, heightMap, this.gameState, this.chunkSize) = (w, h, new TerrainData[w * h], gameState, chunkSize);
             pickingBuffer = new PickingBuffer("terrain.pick", gameState.WindowSize.X, gameState.WindowSize.Y);
 
             terrainShader.BindUniformBlock("ViewMatrices", 0, gameState.ProjectionWorldUniformBufferObject);
@@ -151,7 +153,7 @@ namespace ct3d.WorldPrimitives
         {
             if (Dirty)
             {
-                var (vertices, indices) = BuildTerrainVertices(0..6, 0..6);
+                var (vertices, indices) = BuildTerrainVertices(0..chunkSize, 0..chunkSize);
                 if (vertexIndexBuffer is null)
                     vertexIndexBuffer = new VertexIndexBuffer<Vertex, ushort>(vertices, indices);
                 else

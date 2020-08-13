@@ -2,6 +2,7 @@
 using OpenToolkit.Graphics.OpenGL4;
 using OpenToolkit.Mathematics;
 using OpenToolkit.Windowing.Common;
+using OpenToolkit.Windowing.Common.Input;
 using OpenToolkit.Windowing.Desktop;
 using System;
 using System.Collections.Generic;
@@ -59,21 +60,19 @@ namespace ct3d
             GL.ClearColor(Color4.Aqua);
 
             var rng = new Random();
-            terrain = new Terrain(200, 200, gameState);
+            terrain = new Terrain(600, 600, 10, gameState);
             terrain.SetHeight(1, 1, 1);
             terrain.SetHeight(1, 2, 1);
             terrain.SetHeight(2, 1, 1);
             terrain.SetHeight(2, 2, 1);
 
             terrain.SetRoad(1, 1, TerrainRoadData.Down | TerrainRoadData.Right);
-            terrain.SetRoad(1, 0, TerrainRoadData.Up|TerrainRoadData.Down);
+            terrain.SetRoad(1, 0, TerrainRoadData.Up | TerrainRoadData.Down);
             terrain.SetRoad(2, 1, TerrainRoadData.Left | TerrainRoadData.Right);
             terrain.SetRoad(3, 1, TerrainRoadData.Left | TerrainRoadData.Up | TerrainRoadData.Down);
             terrain.SetRoad(3, 2, TerrainRoadData.Down);
             terrain.SetRoad(3, 0, TerrainRoadData.Up | TerrainRoadData.Right);
             terrain.SetRoad(4, 0, TerrainRoadData.Left);
-
-            gameState.ProjectionWorldUniformBufferObject.Value.World = Matrix4.LookAt(2, -2, 5, 2, 5, 0, 0, 0, 1);
         }
 
         protected override void OnResize(ResizeEventArgs e)
@@ -83,7 +82,7 @@ namespace ct3d
             GL.Viewport(0, 0, e.Width, e.Height);
 
             // set up the projection matrix
-            gameState.ProjectionWorldUniformBufferObject.Value.Projection = Matrix4.CreatePerspectiveFieldOfView(MathF.PI / 2, (float)Size.Y / Size.X, 0.1f, 20f);
+            gameState.ProjectionWorldUniformBufferObject.Value.Projection = Matrix4.CreateOrthographic(10, 10f * Size.Y / Size.X, 0.1f, 20f);
             gameState.ProjectionWorldUniformBufferObject.Upload();
         }
 
@@ -104,6 +103,26 @@ namespace ct3d
             GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
 
             var start = stopwatch.Elapsed;
+
+            const float cameraStep = .1f;
+            if (KeyboardState[Key.A])
+                gameState.CameraPosition.X -= cameraStep;
+            if (KeyboardState[Key.D])
+                gameState.CameraPosition.X += cameraStep;
+            if (KeyboardState[Key.S])
+                gameState.CameraPosition.Y -= cameraStep;
+            if (KeyboardState[Key.W])
+                gameState.CameraPosition.Y += cameraStep;
+
+            gameState.ProjectionWorldUniformBufferObject.Value.World =
+                Matrix4.CreateRotationZ(MathF.PI / 4) *
+                Matrix4.LookAt(
+                    gameState.CameraPosition.X + 5, gameState.CameraPosition.Y, 8,
+                    gameState.CameraPosition.X + 5, gameState.CameraPosition.Y + 5, 0,
+                    0, 0, 1);
+
+            gameState.ProjectionWorldUniformBufferObject.Upload();
+
             terrain.Render();
 
             SwapBuffers();
