@@ -18,20 +18,10 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Content Include="Shaders/*">
+    <Content Include="Shaders/**">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="Media/*.png">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-  </ItemGroup>
-
-  <ItemGroup>
-    <None Remove="Shaders\includes\viewmatrices.glsl" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Content Include="Shaders\includes\viewmatrices.glsl">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
