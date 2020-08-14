@@ -124,7 +124,6 @@ namespace ct3d
             gameState.ProjectionWorldUniformBufferObject.Upload();
 
             terrain.Render();
-
             SwapBuffers();
 
             frameTimesMs.Add((stopwatch.Elapsed - start).TotalMilliseconds);

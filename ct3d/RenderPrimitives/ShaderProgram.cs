@@ -3,7 +3,9 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using ct3d.Support;
 using OpenToolkit.Graphics.OpenGL4;
 using OpenToolkit.Mathematics;
 
@@ -16,19 +18,40 @@ namespace ct3d.RenderPrimitives
         readonly Dictionary<string, int> uniforms = new Dictionary<string, int>();
         private bool disposedValue;
 
+        readonly Dictionary<string, string> shaderIncludeCache = new Dictionary<string, string>();
+        string ReadShaderCode(string path)
+        {
+            // intentionally don't cache the first level
+            var sb = new StringBuilder();
+
+            using var reader = new StreamReader(Path.Combine(PathPrefix, path));
+
+            string line;
+            while ((line = reader.ReadLine()) != null)
+            {
+                var m = Regex.Match(line, @"^#include\s+""([^""]+)""\s*$");
+                if (m.Success)
+                    sb.AppendLine(shaderIncludeCache.GetOrAdd(m.Groups[1].Value, key => ReadShaderCode(Path.Combine("includes", key))));
+                else
+                    sb.AppendLine(line);
+            }
+
+            return sb.ToString();
+        }
+
         public ShaderProgram(string commonShaderPath) : this(commonShaderPath + ".vert", commonShaderPath + ".frag") { }
 
         public ShaderProgram(string vertexShaderPath, string fragmentShaderPath)
         {
             var vertexShader = GL.CreateShader(ShaderType.VertexShader);
-            GL.ShaderSource(vertexShader, File.ReadAllText(Path.Combine(PathPrefix, vertexShaderPath)));
+            GL.ShaderSource(vertexShader, ReadShaderCode(vertexShaderPath));
             GL.CompileShader(vertexShader);
             GL.GetShader(vertexShader, ShaderParameter.CompileStatus, out int compileStatus);
             if (compileStatus == 0)
                 throw new InvalidOperationException($"Vertex shader {vertexShaderPath} could not be compiled:\n\n{GL.GetShaderInfoLog(vertexShader)}");
 
             var fragmentShader = GL.CreateShader(ShaderType.FragmentShader);
-            GL.ShaderSource(fragmentShader, File.ReadAllText(Path.Combine(PathPrefix, fragmentShaderPath)));
+            GL.ShaderSource(fragmentShader, ReadShaderCode(fragmentShaderPath));
             GL.CompileShader(fragmentShader);
             GL.GetShader(fragmentShader, ShaderParameter.CompileStatus, out compileStatus);
             if (compileStatus == 0)

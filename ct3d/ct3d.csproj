@@ -26,4 +26,14 @@
     </Content>
   </ItemGroup>
 
+  <ItemGroup>
+    <None Remove="Shaders\includes\viewmatrices.glsl" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="Shaders\includes\viewmatrices.glsl">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
 </Project>
