@@ -1,5 +1,5 @@
 ﻿using ct3d.RenderPrimitives;
-using OpenToolkit.Mathematics;
+using OpenTK.Mathematics;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -19,7 +19,7 @@ namespace ct3d
         public Vector2 MousePosition, CameraPosition;
         public Vector2i WindowSize;
         public UniformBufferObject<ProjectionWorldUniformBufferObjectValueType> ProjectionWorldUniformBufferObject =
-            new UniformBufferObject<ProjectionWorldUniformBufferObjectValueType>();
+            new();
         private bool disposedValue;
 
         void Dispose(bool disposing)

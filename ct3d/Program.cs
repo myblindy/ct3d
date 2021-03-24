@@ -1,9 +1,10 @@
 ﻿using ct3d.WorldPrimitives;
-using OpenToolkit.Graphics.OpenGL4;
-using OpenToolkit.Mathematics;
-using OpenToolkit.Windowing.Common;
-using OpenToolkit.Windowing.Common.Input;
-using OpenToolkit.Windowing.Desktop;
+using OpenTK.Graphics.OpenGL4;
+using OpenTK.Mathematics;
+using OpenTK.Windowing.Common;
+using OpenTK.Windowing.Common.Input;
+using OpenTK.Windowing.Desktop;
+using OpenTK.Windowing.GraphicsLibraryFramework;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -23,12 +24,12 @@ namespace ct3d
             },
             new NativeWindowSettings
             {
-                Profile = ContextProfile.Any,
+                Profile = ContextProfile.Core,
                 API = ContextAPI.OpenGL,
                 APIVersion = new Version(4, 6),
                 StartFocused = true,
                 StartVisible = true,
-                Size = new Vector2i(800, 600),
+                Size = new(800, 600),
                 Title = "Shitty TTD Clone",
                 Flags = ContextFlags.ForwardCompatible,
             })
@@ -40,13 +41,14 @@ namespace ct3d
 
         protected unsafe override void OnLoad()
         {
-            MakeCurrent();
+            base.OnLoad();
 
             gameState = new GameState { WindowSize = Size };
 
             VSync = VSyncMode.Off;
 
             // enable debug messages
+#if DEBUG
             GL.Enable(EnableCap.DebugOutput);
             GL.Enable(EnableCap.DebugOutputSynchronous);
 
@@ -55,6 +57,7 @@ namespace ct3d
                 if (severity > DebugSeverity.DebugSeverityNotification)
                     Console.WriteLine($"GL ERROR {Encoding.ASCII.GetString((byte*)msg, len)}, type: {type}, severity: {severity}, source: {src}");
             }, IntPtr.Zero);
+#endif
 
             GL.Enable(EnableCap.DepthTest);
             GL.ClearColor(Color4.Aqua);
@@ -77,6 +80,8 @@ namespace ct3d
 
         protected override void OnResize(ResizeEventArgs e)
         {
+            base.OnResize(e);
+
             gameState.WindowSize = e.Size;
 
             GL.Viewport(0, 0, e.Width, e.Height);
@@ -88,34 +93,45 @@ namespace ct3d
 
         protected override void OnMouseMove(MouseMoveEventArgs e)
         {
+            base.OnMouseMove(e);
+
             gameState.MousePosition = e.Position;
         }
 
         protected override void OnUpdateFrame(FrameEventArgs args)
         {
+            base.OnUpdateFrame(args);
+
+            if (IsMouseButtonDown(MouseButton.Button1) && terrain.SelectedCell != Terrain.NoSelectedCell)
+                terrain.AddRoad((int)terrain.SelectedCell.X, (int)terrain.SelectedCell.Y,
+                    Terrain.TerrainRoadDataFromUV(new(terrain.SelectedCell.X % 1, terrain.SelectedCell.Y % 1)));
         }
 
         readonly Stopwatch stopwatch = Stopwatch.StartNew();
-        readonly List<double> frameTimesMs = new List<double>();
+        readonly List<double> frameTimesMs = new();
+
+        static readonly Matrix4 worldTransformFix = Matrix4.CreateRotationZ(MathF.PI / 4);
 
         protected override void OnRenderFrame(FrameEventArgs args)
         {
+            base.OnRenderFrame(args);
+
             GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
 
             var start = stopwatch.Elapsed;
 
             const float cameraStep = .1f;
-            if (KeyboardState[Key.A])
+            if (KeyboardState[Keys.A])
                 gameState.CameraPosition.X -= cameraStep;
-            if (KeyboardState[Key.D])
+            if (KeyboardState[Keys.D])
                 gameState.CameraPosition.X += cameraStep;
-            if (KeyboardState[Key.S])
+            if (KeyboardState[Keys.S])
                 gameState.CameraPosition.Y -= cameraStep;
-            if (KeyboardState[Key.W])
+            if (KeyboardState[Keys.W])
                 gameState.CameraPosition.Y += cameraStep;
 
             gameState.ProjectionWorldUniformBufferObject.Value.World =
-                Matrix4.CreateRotationZ(MathF.PI / 4) *
+                worldTransformFix *
                 Matrix4.LookAt(
                     gameState.CameraPosition.X + 5, gameState.CameraPosition.Y, 8,
                     gameState.CameraPosition.X + 5, gameState.CameraPosition.Y + 5, 0,

@@ -4,8 +4,8 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
-using OpenToolkit.Graphics.OpenGL4;
-using OpenToolkit.Mathematics;
+using OpenTK.Graphics.OpenGL4;
+using OpenTK.Mathematics;
 
 namespace ct3d.RenderPrimitives
 {
@@ -19,8 +19,8 @@ namespace ct3d.RenderPrimitives
             public int Size;
         }
 
-        static readonly Dictionary<Type, VertexTypeCacheType> vertexTypeCache = new Dictionary<Type, VertexTypeCacheType>();
-        static readonly Dictionary<Type, VertexAttribType> vertexAttribTypesCache = new Dictionary<Type, VertexAttribType>
+        static readonly Dictionary<Type, VertexTypeCacheType> vertexTypeCache = new();
+        static readonly Dictionary<Type, VertexAttribType> vertexAttribTypesCache = new()
         {
             [typeof(float)] = VertexAttribType.Float,
             [typeof(Vector2)] = VertexAttribType.Float,
@@ -30,7 +30,7 @@ namespace ct3d.RenderPrimitives
             [typeof(int)] = VertexAttribType.Int,
             [typeof(uint)] = VertexAttribType.UnsignedInt,
         };
-        static readonly Dictionary<Type, int> componentCountCache = new Dictionary<Type, int>
+        static readonly Dictionary<Type, int> componentCountCache = new()
         {
             [typeof(float)] = 1,
             [typeof(Vector2)] = 2,

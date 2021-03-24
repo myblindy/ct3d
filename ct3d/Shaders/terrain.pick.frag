@@ -1,12 +1,10 @@
 ﻿#version 460
 
-in vec4 fNormal;
-in vec4 fColor;
+in vec2 fUV;
 
-out int outputPrimitiveID;
+out vec3 result;
 
 void main(void)
 {
-    // black grid
-    outputPrimitiveID = gl_PrimitiveID + 1;
+    result = vec3(gl_PrimitiveID + 1, fUV);
 }

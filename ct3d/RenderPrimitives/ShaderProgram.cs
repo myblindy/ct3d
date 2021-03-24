@@ -6,8 +6,8 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using ct3d.Support;
-using OpenToolkit.Graphics.OpenGL4;
-using OpenToolkit.Mathematics;
+using OpenTK.Graphics.OpenGL4;
+using OpenTK.Mathematics;
 
 namespace ct3d.RenderPrimitives
 {
@@ -15,10 +15,10 @@ namespace ct3d.RenderPrimitives
     {
         const string PathPrefix = "Shaders";
         readonly int programObject;
-        readonly Dictionary<string, int> uniforms = new Dictionary<string, int>();
+        readonly Dictionary<string, int> uniforms = new();
         private bool disposedValue;
 
-        readonly Dictionary<string, string> shaderIncludeCache = new Dictionary<string, string>();
+        readonly Dictionary<string, string> shaderIncludeCache = new();
         string ReadShaderCode(string path)
         {
             // intentionally don't cache the first level

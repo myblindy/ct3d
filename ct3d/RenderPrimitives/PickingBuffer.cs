@@ -1,5 +1,5 @@
-﻿using OpenToolkit.Graphics.OpenGL4;
-using OpenToolkit.Mathematics;
+﻿using OpenTK.Graphics.OpenGL4;
+using OpenTK.Mathematics;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -29,21 +29,26 @@ namespace ct3d.RenderPrimitives
         /// </summary>
         public uint SelectedPrimitiveID { get; private set; }
 
+        /// <summary>
+        /// The position within the result of the test at <see cref="TestPosition"/>.
+        /// </summary>
+        public Vector2 SelectedPrimitiveUV { get; private set; }
+
         public PickingBuffer(string shaderName, int w, int h, int buffersCount = 2)
         {
             GL.CreateFramebuffers(1, out frameBufferObject);
 
             GL.CreateTextures(TextureTarget.Texture2D, 1, out pickingTextureObject);
-            GL.TextureStorage2D(pickingTextureObject, 1, SizedInternalFormat.R8ui, w, h);
+            GL.TextureStorage2D(pickingTextureObject, 1, (SizedInternalFormat)All.Rgb32f, w, h);
             GL.NamedFramebufferTexture(frameBufferObject, FramebufferAttachment.ColorAttachment0, pickingTextureObject, 0);
 
             GL.CreateBuffers(buffersCount, pixelBufferObjects = new int[buffersCount]);
             for (int idx = 0; idx < buffersCount; ++idx)
-                GL.NamedBufferData(pixelBufferObjects[idx], sizeof(uint), IntPtr.Zero, BufferUsageHint.DynamicRead);
+                GL.NamedBufferData(pixelBufferObjects[idx], Unsafe.SizeOf<Vector3>(), IntPtr.Zero, BufferUsageHint.DynamicRead);
 
             GL.CreateRenderbuffers(1, out depthRenderBufferObject);
             GL.NamedRenderbufferStorage(depthRenderBufferObject, RenderbufferStorage.DepthComponent, w, h);
-            GL.NamedFramebufferRenderbuffer(depthRenderBufferObject, FramebufferAttachment.DepthAttachment, RenderbufferTarget.Renderbuffer, depthRenderBufferObject);
+            GL.NamedFramebufferRenderbuffer(frameBufferObject, FramebufferAttachment.DepthAttachment, RenderbufferTarget.Renderbuffer, depthRenderBufferObject);
 
             GL.ReadBuffer(ReadBufferMode.None);
             GL.NamedFramebufferDrawBuffer(frameBufferObject, DrawBufferMode.ColorAttachment0);
@@ -61,7 +66,7 @@ namespace ct3d.RenderPrimitives
             GL.BindFramebuffer(FramebufferTarget.DrawFramebuffer, frameBufferObject);
         }
 
-        public void UnbindAndProcess()
+        public unsafe void UnbindAndProcess()
         {
             // done drawing, unmap the draw frame buffer
             GL.BindFramebuffer(FramebufferTarget.DrawFramebuffer, 0);
@@ -72,7 +77,7 @@ namespace ct3d.RenderPrimitives
             GL.ReadBuffer(ReadBufferMode.ColorAttachment0);
 
             // start the read operation for 1 "pixel" (ie 1 int)
-            GL.ReadPixels(TestPosition.X, TestPosition.Y, 1, 1, PixelFormat.RedInteger, PixelType.Int, IntPtr.Zero);
+            GL.ReadPixels(TestPosition.X, TestPosition.Y, 1, 1, PixelFormat.Rgb, PixelType.Float, IntPtr.Zero);
 
             // unmap everything pixel packing and framebuffer related
             GL.BindBuffer(BufferTarget.PixelPackBuffer, 0);
@@ -81,7 +86,9 @@ namespace ct3d.RenderPrimitives
 
             // increment the current pixel buffer and map it to system memory to read the selected ID
             currentPixelBufferObject = (currentPixelBufferObject + 1) % pixelBufferObjects.Length;
-            SelectedPrimitiveID = (uint)Marshal.ReadInt32(GL.MapNamedBuffer(pixelBufferObjects[currentPixelBufferObject], BufferAccess.ReadOnly));
+            var result = (Vector3*)GL.MapNamedBuffer(pixelBufferObjects[currentPixelBufferObject], BufferAccess.ReadOnly).ToPointer();
+            SelectedPrimitiveID = (uint)result->X;
+            SelectedPrimitiveUV = result->Yz;
             GL.UnmapNamedBuffer(pixelBufferObjects[currentPixelBufferObject]);
         }
 
