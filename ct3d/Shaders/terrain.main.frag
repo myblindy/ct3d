@@ -22,5 +22,5 @@ void main(void)
         }
 
     vec4 roadSample = texture(roadsTexture, fUV);
-    outputColor = mix(fColor.rgb, roadSample.rgb, roadSample.a) * 0 + roadSample.rgb * 0.5 + vec3(fUV2, 0.0) * 0.5;
+    outputColor = mix(fColor.rgb, roadSample.rgb, roadSample.a);
 }
