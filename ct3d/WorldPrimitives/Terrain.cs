@@ -15,6 +15,7 @@ namespace ct3d.WorldPrimitives
     {
         readonly TerrainData[] heightMap;
         readonly GameState gameState;
+        readonly TerrainGraph terrainGraph;
 
         public int Width { get; }
         public int Height { get; }
@@ -144,7 +145,7 @@ namespace ct3d.WorldPrimitives
 
         public Terrain(int w, int h, int chunkSize, GameState gameState)
         {
-            (Width, Height, heightMap, this.gameState, this.chunkSize) = (w, h, new TerrainData[w * h], gameState, chunkSize);
+            (Width, Height, heightMap, this.gameState, this.chunkSize, terrainGraph) = (w, h, new TerrainData[w * h], gameState, chunkSize, new(this));
             pickingBuffer = new PickingBuffer("terrain.pick", gameState.WindowSize.X, gameState.WindowSize.Y);
 
             terrainShader.BindUniformBlock("ViewMatrices", 0, gameState.ProjectionWorldUniformBufferObject);
@@ -153,10 +154,10 @@ namespace ct3d.WorldPrimitives
         }
 
         public void SetHeight(int x, int y, byte height) { heightMap[x * Width + y].Height = height; Dirty = true; }
-        public void SetRoad(int x, int y, TerrainRoadData roadData) { Dirty |= this[x, y].RoadData != roadData; heightMap[x * Width + y].RoadData = roadData; }
+        public void SetRoad(int x, int y, TerrainRoadData roadData) { Dirty |= this[x, y].RoadData != roadData; terrainGraph.UpdateGraph(x, y, roadData); heightMap[x * Width + y].RoadData = roadData; }
         public void AddRoad(int x, int y, TerrainRoadData roadData) => SetRoad(x, y, this[x, y].RoadData | roadData);
         public void RemoveRoad(int x, int y, TerrainRoadData roadData) => SetRoad(x, y, this[x, y].RoadData & ~roadData);
-        public ref TerrainData this[int x, int y] => ref heightMap[x * Width + y];
+        public ref TerrainData this[int x, int y] { get { if (x < 0 || y < 0 || x >= Width || y >= Height) return ref TerrainData.OutOfBounds; return ref heightMap[x * Width + y]; } }
 
         public static TerrainRoadData TerrainRoadDataFromUV(Vector2 uv)
         {
@@ -248,6 +249,8 @@ namespace ct3d.WorldPrimitives
     [StructLayout(LayoutKind.Sequential, Pack = 1)]
     internal struct TerrainData
     {
+        public static TerrainData OutOfBounds = new();
+
         public byte Height;
         public TerrainRoadData RoadData { get => (TerrainRoadData)(info & 0xF); set => info = (byte)(info & 0xF0 | (byte)value); }
 

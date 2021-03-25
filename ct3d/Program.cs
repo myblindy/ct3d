@@ -69,13 +69,17 @@ namespace ct3d
             terrain.SetHeight(2, 1, 1);
             terrain.SetHeight(2, 2, 1);
 
-            terrain.SetRoad(1, 1, TerrainRoadData.Down | TerrainRoadData.Right);
-            terrain.SetRoad(1, 0, TerrainRoadData.Up | TerrainRoadData.Down);
-            terrain.SetRoad(2, 1, TerrainRoadData.Left | TerrainRoadData.Right);
-            terrain.SetRoad(3, 1, TerrainRoadData.Left | TerrainRoadData.Up | TerrainRoadData.Down);
-            terrain.SetRoad(3, 2, TerrainRoadData.Down);
-            terrain.SetRoad(3, 0, TerrainRoadData.Up | TerrainRoadData.Right);
-            terrain.SetRoad(4, 0, TerrainRoadData.Left);
+            //terrain.SetRoad(1, 1, TerrainRoadData.Down | TerrainRoadData.Right);
+            //terrain.SetRoad(1, 0, TerrainRoadData.Up | TerrainRoadData.Down);
+            //terrain.SetRoad(2, 1, TerrainRoadData.Left | TerrainRoadData.Right);
+            //terrain.SetRoad(3, 1, TerrainRoadData.Left | TerrainRoadData.Up | TerrainRoadData.Down);
+            //terrain.SetRoad(3, 2, TerrainRoadData.Down);
+            //terrain.SetRoad(3, 0, TerrainRoadData.Up | TerrainRoadData.Right);
+            //terrain.SetRoad(4, 0, TerrainRoadData.Left);
+            terrain.AddRoad(1, 1, TerrainRoadData.Right);
+            terrain.AddRoad(3, 1, TerrainRoadData.Left);
+            terrain.AddRoad(2, 1, TerrainRoadData.Right);
+            terrain.AddRoad(2, 1, TerrainRoadData.Left);
         }
 
         protected override void OnResize(ResizeEventArgs e)
