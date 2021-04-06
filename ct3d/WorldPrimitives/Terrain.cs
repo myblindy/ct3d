@@ -102,19 +102,21 @@ namespace ct3d.WorldPrimitives
                         ref var terrainX0Y1 = ref this[x, y + 1];
                         var vx0y1 = new Vector3(x0, y0 + 1, transformHeight(terrainX0Y1.Height));
 
+                        const float uvMin = 0.05f, uvMax = 0.95f;
+
                         // transpose the seam if needed
                         if (vx0y0.Z == vx1y0.Z && vx0y0.Z == vx0y1.Z && vx0y0.Z != vx1y1.Z ||
                             vx1y1.Z == vx1y0.Z && vx1y1.Z == vx0y1.Z && vx0y0.Z != vx1y1.Z)
                         {
                             var normal = Vector3.Normalize(Vector3.Cross(vx0y0 - vx1y0, vx0y0 - vx0y1));
-                            *vertex++ = new Vertex { Position = vx0y0, Color = grassColor, Normal = normal, RoadsIndex = (int)terrainX0Y0.RoadData, UV = new(0, 0) };
-                            *vertex++ = new Vertex { Position = vx1y0, Color = grassColor, Normal = normal, RoadsIndex = (int)terrainX0Y0.RoadData, UV = new(1, 0) };
-                            *vertex++ = new Vertex { Position = vx0y1, Color = grassColor, Normal = normal, RoadsIndex = (int)terrainX0Y0.RoadData, UV = new(0, 1) };
+                            *vertex++ = new Vertex { Position = vx0y0, Color = grassColor, Normal = normal, RoadsIndex = (int)terrainX0Y0.RoadData, UV = new(uvMin, uvMin) };
+                            *vertex++ = new Vertex { Position = vx1y0, Color = grassColor, Normal = normal, RoadsIndex = (int)terrainX0Y0.RoadData, UV = new(uvMax, uvMin) };
+                            *vertex++ = new Vertex { Position = vx0y1, Color = grassColor, Normal = normal, RoadsIndex = (int)terrainX0Y0.RoadData, UV = new(uvMin, uvMax) };
 
                             normal = -Vector3.Normalize(Vector3.Cross(vx1y0 - vx0y1, vx1y0 - vx1y1));
-                            *vertex++ = new Vertex { Position = vx1y0, Color = grassColor, Normal = normal, RoadsIndex = (int)terrainX0Y0.RoadData, UV = new(1, 0) };
-                            *vertex++ = new Vertex { Position = vx0y1, Color = grassColor, Normal = normal, RoadsIndex = (int)terrainX0Y0.RoadData, UV = new(0, 1) };
-                            *vertex++ = new Vertex { Position = vx1y1, Color = grassColor, Normal = normal, RoadsIndex = (int)terrainX0Y0.RoadData, UV = new(1, 1) };
+                            *vertex++ = new Vertex { Position = vx1y0, Color = grassColor, Normal = normal, RoadsIndex = (int)terrainX0Y0.RoadData, UV = new(uvMax, uvMin) };
+                            *vertex++ = new Vertex { Position = vx0y1, Color = grassColor, Normal = normal, RoadsIndex = (int)terrainX0Y0.RoadData, UV = new(uvMin, uvMax) };
+                            *vertex++ = new Vertex { Position = vx1y1, Color = grassColor, Normal = normal, RoadsIndex = (int)terrainX0Y0.RoadData, UV = new(uvMax, uvMax) };
 
                             // use the index buffer to draw the grid lines with the vertices above
                             if (y0 > 0)
@@ -132,14 +134,14 @@ namespace ct3d.WorldPrimitives
                         else
                         {
                             var normal = Vector3.Normalize(Vector3.Cross(vx1y0 - vx0y0, vx1y1 - vx0y0));
-                            *vertex++ = new Vertex { Position = vx0y0, Color = grassColor, Normal = normal, RoadsIndex = (int)terrainX0Y0.RoadData, UV = new(0, 0) };
-                            *vertex++ = new Vertex { Position = vx1y0, Color = grassColor, Normal = normal, RoadsIndex = (int)terrainX0Y0.RoadData, UV = new(1, 0) };
-                            *vertex++ = new Vertex { Position = vx1y1, Color = grassColor, Normal = normal, RoadsIndex = (int)terrainX0Y0.RoadData, UV = new(1, 1) };
+                            *vertex++ = new Vertex { Position = vx0y0, Color = grassColor, Normal = normal, RoadsIndex = (int)terrainX0Y0.RoadData, UV = new(uvMin, uvMin) };
+                            *vertex++ = new Vertex { Position = vx1y0, Color = grassColor, Normal = normal, RoadsIndex = (int)terrainX0Y0.RoadData, UV = new(uvMax, uvMin) };
+                            *vertex++ = new Vertex { Position = vx1y1, Color = grassColor, Normal = normal, RoadsIndex = (int)terrainX0Y0.RoadData, UV = new(uvMax, uvMax) };
 
                             normal = Vector3.Normalize(Vector3.Cross(vx1y1 - vx0y0, vx0y1 - vx0y0));
-                            *vertex++ = new Vertex { Position = vx0y0, Color = grassColor, Normal = normal, RoadsIndex = (int)terrainX0Y0.RoadData, UV = new(0, 0) };
-                            *vertex++ = new Vertex { Position = vx1y1, Color = grassColor, Normal = normal, RoadsIndex = (int)terrainX0Y0.RoadData, UV = new(1, 1) };
-                            *vertex++ = new Vertex { Position = vx0y1, Color = grassColor, Normal = normal, RoadsIndex = (int)terrainX0Y0.RoadData, UV = new(0, 1) };
+                            *vertex++ = new Vertex { Position = vx0y0, Color = grassColor, Normal = normal, RoadsIndex = (int)terrainX0Y0.RoadData, UV = new(uvMin, uvMin) };
+                            *vertex++ = new Vertex { Position = vx1y1, Color = grassColor, Normal = normal, RoadsIndex = (int)terrainX0Y0.RoadData, UV = new(uvMax, uvMax) };
+                            *vertex++ = new Vertex { Position = vx0y1, Color = grassColor, Normal = normal, RoadsIndex = (int)terrainX0Y0.RoadData, UV = new(uvMin, uvMax) };
 
                             // use the index buffer to draw the grid lines with the vertices above
                             if (y0 > 0)
@@ -255,7 +257,7 @@ namespace ct3d.WorldPrimitives
 
                         // inside at position u,v
                         (SelectedCell, found) = (new(tri.A.X + u, tri.A.X + v), true);
-                        selectedPrimitiveId = triIdx;
+                        selectedPrimitiveId = triIdx & ~1U;
                         break;
                     }
                 }
