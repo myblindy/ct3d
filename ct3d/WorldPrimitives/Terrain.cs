@@ -226,7 +226,7 @@ namespace ct3d.WorldPrimitives
 
                 var cameraOrigin = gameState.CameraOrigin;
 
-                var normalizedScreenMousePosition = new Vector4(gameState.MousePosition.X / gameState.WindowSize.X * 2 - 1, -(gameState.MousePosition.Y / gameState.WindowSize.Y * 2 - 1), 1f, 1f);
+                var normalizedScreenMousePosition = new Vector4(gameState.MousePosition.X / gameState.WindowSize.X * 2 - 1, 1 - (gameState.MousePosition.Y / gameState.WindowSize.Y * 2 - 1), 1f, 1f);
                 if (!Matrix4x4.Invert(gameState.ProjectionWorldUniformBufferObject.Value.View * gameState.ProjectionWorldUniformBufferObject.Value.Projection, out var invertedProjectionViewTransform))
                     throw new InvalidOperationException();
                 var screenMousePosition = Vector4.Transform(normalizedScreenMousePosition, Matrix4x4.Transpose(invertedProjectionViewTransform));
@@ -245,7 +245,7 @@ namespace ct3d.WorldPrimitives
 
                         var pVec = Vector3.Cross(cameraDirection, edge2);
                         var det = Vector3.Dot(edge1, pVec);
-                        if (Math.Abs(det) < 1e-8) throw new InvalidOperationException();        // degenerate triangle?
+                        if (Math.Abs(det) < 1e-9) throw new InvalidOperationException();        // degenerate triangle?
                         var invDet = 1f / det;
 
                         var tVec = cameraOrigin - tri.A;
