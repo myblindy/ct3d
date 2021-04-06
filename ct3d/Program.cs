@@ -9,6 +9,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Numerics;
 using System.Text;
 
 namespace ct3d
@@ -43,7 +44,7 @@ namespace ct3d
         {
             base.OnLoad();
 
-            gameState = new GameState { WindowSize = Size };
+            gameState = new GameState { WindowSize = new(Size.X, Size.Y) };
 
             VSync = VSyncMode.Off;
 
@@ -86,12 +87,14 @@ namespace ct3d
         {
             base.OnResize(e);
 
-            gameState.WindowSize = e.Size;
+            gameState.WindowSize = new(e.Size.X, e.Size.Y);
 
             GL.Viewport(0, 0, e.Width, e.Height);
 
             // set up the projection matrix
-            gameState.ProjectionWorldUniformBufferObject.Value.Projection = Matrix4.CreateOrthographic(10, 10f * Size.Y / Size.X, 0.1f, 20f);
+            gameState.CameraFrustrumSize = new(10, 10f * Size.Y / Size.X);
+            gameState.ProjectionWorldUniformBufferObject.Value.Projection = Matrix4x4.CreateOrthographic(gameState.CameraFrustrumSize.X, gameState.CameraFrustrumSize.Y, 0.1f, 20f);
+
             gameState.ProjectionWorldUniformBufferObject.Upload();
         }
 
@@ -99,12 +102,30 @@ namespace ct3d
         {
             base.OnMouseMove(e);
 
-            gameState.MousePosition = e.Position;
+            gameState.MousePosition = new(e.Position.X, e.Position.Y);
         }
 
         protected override void OnUpdateFrame(FrameEventArgs args)
         {
             base.OnUpdateFrame(args);
+
+            const float cameraStep = .1f;
+            if (KeyboardState[Keys.A])
+                gameState.CameraPosition.X -= cameraStep;
+            if (KeyboardState[Keys.D])
+                gameState.CameraPosition.X += cameraStep;
+            if (KeyboardState[Keys.S])
+                gameState.CameraPosition.Y -= cameraStep;
+            if (KeyboardState[Keys.W])
+                gameState.CameraPosition.Y += cameraStep;
+
+            gameState.ProjectionWorldUniformBufferObject.Value.View =
+                //worldTransformFix *
+                gameState.GetCameraTransform();
+
+            gameState.ProjectionWorldUniformBufferObject.Upload();
+
+            terrain.Update();
 
             if (IsMouseButtonDown(MouseButton.Button1) && terrain.SelectedCell != Terrain.NoSelectedCell)
                 terrain.AddRoad((int)terrain.SelectedCell.X, (int)terrain.SelectedCell.Y,
@@ -123,25 +144,6 @@ namespace ct3d
             GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
 
             var start = stopwatch.Elapsed;
-
-            const float cameraStep = .1f;
-            if (KeyboardState[Keys.A])
-                gameState.CameraPosition.X -= cameraStep;
-            if (KeyboardState[Keys.D])
-                gameState.CameraPosition.X += cameraStep;
-            if (KeyboardState[Keys.S])
-                gameState.CameraPosition.Y -= cameraStep;
-            if (KeyboardState[Keys.W])
-                gameState.CameraPosition.Y += cameraStep;
-
-            gameState.ProjectionWorldUniformBufferObject.Value.World =
-                worldTransformFix *
-                Matrix4.LookAt(
-                    gameState.CameraPosition.X + 5, gameState.CameraPosition.Y, 8,
-                    gameState.CameraPosition.X + 5, gameState.CameraPosition.Y + 5, 0,
-                    0, 0, 1);
-
-            gameState.ProjectionWorldUniformBufferObject.Upload();
 
             terrain.Render();
             SwapBuffers();

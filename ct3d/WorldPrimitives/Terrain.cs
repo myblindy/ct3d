@@ -1,10 +1,11 @@
 ﻿using ct3d.RenderPrimitives;
 using ct3d.Support;
+using MoreLinq;
 using OpenTK.Graphics.OpenGL4;
-using OpenTK.Mathematics;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Numerics;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
@@ -20,7 +21,7 @@ namespace ct3d.WorldPrimitives
         public int Width { get; }
         public int Height { get; }
 
-        public bool Dirty { get; set; } = true;
+        public bool HeightMapDirty { get; set; } = true;
 
         /// <summary>
         /// Returns the selected cell, if any, including the decimal portion. If no cell is selected, returns <see cref="NoSelectedCell"/>.
@@ -28,31 +29,49 @@ namespace ct3d.WorldPrimitives
         public Vector2 SelectedCell { get; private set; }
         public static readonly Vector2 NoSelectedCell = new(-1, -1);
 
+        uint selectedPrimitiveId;
+
         readonly int chunkSize;
 
         readonly Texture roadsTexture = new("roads.png");
 
         readonly ShaderProgram terrainShader = new("terrain.main");
         readonly ShaderProgram gridShader = new("terrain.grid");
-        readonly PickingBuffer pickingBuffer;
+        //readonly PickingBuffer pickingBuffer;
 
         [StructLayout(LayoutKind.Sequential, Pack = 1)]
         struct Vertex
         {
             public Vector3 Position, Normal;
-            public Color4 Color;
+            public Vector4 Color;
             public Vector2 UV;
             public int RoadsIndex;
         }
-        VertexIndexBuffer<Vertex, ushort> vertexIndexBuffer;
+
+        struct Triangle
+        {
+            public Vector3 A, B, C;
+
+            public Triangle(Vector3 a, Vector3 b, Vector3 c) => (A, B, C) = (a, b, c);
+        }
+
+        struct TerrainChunk
+        {
+            public VertexIndexBuffer<Vertex, ushort> VertexIndexBuffer;
+            public Triangle[] Triangles;
+            public Vector2 Offset;
+            public Vector2 Size;
+        }
+
+        readonly TerrainChunk[] terrainChunks = new TerrainChunk[1];
 
         bool disposedValue;
 
-        static readonly Color4 grassColor = Color4.Lime;
+        static readonly Vector4 grassColor = new(0, 1, 0, 0);
 
         unsafe (Vertex[], ushort[]) BuildTerrainVertices(Range xRange, Range yRange)
         {
-            var vertices = new Vertex[(xRange.End.Value - xRange.Start.Value) * (yRange.End.Value - yRange.Start.Value) * 6];
+            var vertices = new Vertex[(xRange.End.Value - xRange.Start.Value - 1) * (yRange.End.Value - yRange.Start.Value - 1) * 6];
             var indices = new ushort[
                 2 * (xRange.End.Value - xRange.Start.Value) * (yRange.End.Value - yRange.Start.Value - 1) +
                 2 * (xRange.End.Value - xRange.Start.Value - 1) * (yRange.End.Value - yRange.Start.Value)];
@@ -92,8 +111,7 @@ namespace ct3d.WorldPrimitives
                             *vertex++ = new Vertex { Position = vx1y0, Color = grassColor, Normal = normal, RoadsIndex = (int)terrainX0Y0.RoadData, UV = new(1, 0) };
                             *vertex++ = new Vertex { Position = vx0y1, Color = grassColor, Normal = normal, RoadsIndex = (int)terrainX0Y0.RoadData, UV = new(0, 1) };
 
-                            Vector3.Cross(vx1y0 - vx0y1, vx1y0 - vx1y1, out normal);
-                            normal = -Vector3.Normalize(normal);
+                            normal = -Vector3.Normalize(Vector3.Cross(vx1y0 - vx0y1, vx1y0 - vx1y1));
                             *vertex++ = new Vertex { Position = vx1y0, Color = grassColor, Normal = normal, RoadsIndex = (int)terrainX0Y0.RoadData, UV = new(1, 0) };
                             *vertex++ = new Vertex { Position = vx0y1, Color = grassColor, Normal = normal, RoadsIndex = (int)terrainX0Y0.RoadData, UV = new(0, 1) };
                             *vertex++ = new Vertex { Position = vx1y1, Color = grassColor, Normal = normal, RoadsIndex = (int)terrainX0Y0.RoadData, UV = new(1, 1) };
@@ -118,8 +136,7 @@ namespace ct3d.WorldPrimitives
                             *vertex++ = new Vertex { Position = vx1y0, Color = grassColor, Normal = normal, RoadsIndex = (int)terrainX0Y0.RoadData, UV = new(1, 0) };
                             *vertex++ = new Vertex { Position = vx1y1, Color = grassColor, Normal = normal, RoadsIndex = (int)terrainX0Y0.RoadData, UV = new(1, 1) };
 
-                            Vector3.Cross(vx1y1 - vx0y0, vx0y1 - vx0y0, out normal);
-                            normal = Vector3.Normalize(normal);
+                            normal = Vector3.Normalize(Vector3.Cross(vx1y1 - vx0y0, vx0y1 - vx0y0));
                             *vertex++ = new Vertex { Position = vx0y0, Color = grassColor, Normal = normal, RoadsIndex = (int)terrainX0Y0.RoadData, UV = new(0, 0) };
                             *vertex++ = new Vertex { Position = vx1y1, Color = grassColor, Normal = normal, RoadsIndex = (int)terrainX0Y0.RoadData, UV = new(1, 1) };
                             *vertex++ = new Vertex { Position = vx0y1, Color = grassColor, Normal = normal, RoadsIndex = (int)terrainX0Y0.RoadData, UV = new(0, 1) };
@@ -146,15 +163,13 @@ namespace ct3d.WorldPrimitives
         public Terrain(int w, int h, int chunkSize, GameState gameState)
         {
             (Width, Height, heightMap, this.gameState, this.chunkSize, terrainGraph) = (w, h, new TerrainData[w * h], gameState, chunkSize, new(this));
-            pickingBuffer = new PickingBuffer("terrain.pick", gameState.WindowSize.X, gameState.WindowSize.Y);
 
             terrainShader.BindUniformBlock("ViewMatrices", 0, gameState.ProjectionWorldUniformBufferObject);
             gridShader.BindUniformBlock("ViewMatrices", 0, gameState.ProjectionWorldUniformBufferObject);
-            pickingBuffer.Shader.BindUniformBlock("ViewMatrices", 0, gameState.ProjectionWorldUniformBufferObject);
         }
 
-        public void SetHeight(int x, int y, byte height) { heightMap[x * Width + y].Height = height; Dirty = true; }
-        public void SetRoad(int x, int y, TerrainRoadData roadData) { Dirty |= this[x, y].RoadData != roadData; terrainGraph.UpdateGraph(x, y, roadData); heightMap[x * Width + y].RoadData = roadData; }
+        public void SetHeight(int x, int y, byte height) { heightMap[x * Width + y].Height = height; HeightMapDirty = true; }
+        public void SetRoad(int x, int y, TerrainRoadData roadData) { HeightMapDirty |= this[x, y].RoadData != roadData; terrainGraph.UpdateGraph(x, y, roadData); heightMap[x * Width + y].RoadData = roadData; }
         public void AddRoad(int x, int y, TerrainRoadData roadData) => SetRoad(x, y, this[x, y].RoadData | roadData);
         public void RemoveRoad(int x, int y, TerrainRoadData roadData) => SetRoad(x, y, this[x, y].RoadData & ~roadData);
         public ref TerrainData this[int x, int y] { get { if (x < 0 || y < 0 || x >= Width || y >= Height) return ref TerrainData.OutOfBounds; return ref heightMap[x * Width + y]; } }
@@ -172,41 +187,105 @@ namespace ct3d.WorldPrimitives
                 : uv.Y.Between(-absUv.X, absUv.X) ? TerrainRoadData.Right : uv.Y < absUv.X ? TerrainRoadData.Down : TerrainRoadData.Up;
         }
 
+        Vector2 LastMousePosition = new(-1, -1);
+
+        static Vector4 Extend(Vector2 v, float z, float w) => new(v.X, v.Y, z, w);
+        static Vector3 Extend(Vector2 v, float z) => new(v.X, v.Y, z);
+
+        public void Update()
+        {
+            for (int chunkIdx = 0; chunkIdx < terrainChunks.Length; ++chunkIdx)
+                if (HeightMapDirty)
+                {
+                    ref var chunk = ref terrainChunks[chunkIdx];
+                    var (vertices, indices) = BuildTerrainVertices(0..chunkSize, 0..chunkSize);
+                    if (chunk.VertexIndexBuffer is null)
+                        chunk.VertexIndexBuffer = new(vertices, indices);
+                    else
+                        chunk.VertexIndexBuffer.Update(vertices, indices);
+
+                    if (chunk.Triangles?.Length != vertices.Length / 3)
+                        chunk.Triangles = new Triangle[vertices.Length / 3];
+                    for (int tri = 0; tri < chunk.Triangles.Length; ++tri)
+                        chunk.Triangles[tri] = new(vertices[tri * 3].Position, vertices[tri * 3 + 1].Position, vertices[tri * 3 + 2].Position);
+
+                    chunk.Offset = new(0, 0);
+                    chunk.Size = new(chunkSize, chunkSize);
+
+                    HeightMapDirty = false;
+                }
+
+            // terrain cell pick
+            if (LastMousePosition != gameState.MousePosition)
+            {
+                LastMousePosition = gameState.MousePosition;
+
+                var found = false;
+
+                var cameraOrigin = gameState.CameraOrigin;
+
+                var normalizedScreenMousePosition = new Vector4(gameState.MousePosition.X / gameState.WindowSize.X * 2 - 1, -(gameState.MousePosition.Y / gameState.WindowSize.Y * 2 - 1), 1f, 1f);
+                if (!Matrix4x4.Invert(gameState.ProjectionWorldUniformBufferObject.Value.View * gameState.ProjectionWorldUniformBufferObject.Value.Projection, out var invertedProjectionViewTransform))
+                    throw new InvalidOperationException();
+                var screenMousePosition = Vector4.Transform(normalizedScreenMousePosition, invertedProjectionViewTransform);
+                var cameraDirection = Vector3.Normalize(new Vector3(screenMousePosition.X, screenMousePosition.Y, screenMousePosition.Z));
+
+                for (int chunkIdx = 0; chunkIdx < terrainChunks.Length; ++chunkIdx)
+                {
+                    ref var chunk = ref terrainChunks[chunkIdx];
+                    for (uint triIdx = 0; triIdx < chunk.Triangles.Length; ++triIdx)
+                    {
+                        ref var tri = ref chunk.Triangles[triIdx];
+
+                        var edge1 = tri.B - tri.A;
+                        var edge2 = tri.C - tri.A;
+
+                        var pVec = Vector3.Cross(cameraDirection, edge2);
+                        var det = Vector3.Dot(edge1, pVec);
+                        if (Math.Abs(det) < 1e-8) throw new InvalidOperationException();        // degenerate triangle?
+                        var invDet = 1f / det;
+
+                        var tVec = cameraOrigin - tri.A;
+                        var u = Vector3.Dot(tVec, pVec) * invDet;
+                        if (u < 0 || u > 1) continue;           // outside
+
+                        var qVec = Vector3.Cross(tVec, edge1);
+                        var v = Vector3.Dot(cameraDirection, qVec) * invDet;
+                        if (v < 0 || u + v > 1) continue;       // outside
+
+                        // inside at position u,v
+                        (SelectedCell, found) = (new(tri.A.X + u, tri.A.X + v), true);
+                        selectedPrimitiveId = triIdx;
+                        break;
+                    }
+                }
+
+                if (!found)
+                    SelectedCell = NoSelectedCell;
+            }
+        }
+
         public void Render()
         {
-            if (Dirty)
-            {
-                var (vertices, indices) = BuildTerrainVertices(0..chunkSize, 0..chunkSize);
-                if (vertexIndexBuffer is null)
-                    vertexIndexBuffer = new(vertices, indices);
-                else
-                    vertexIndexBuffer.Update(vertices, indices);
+            ref var chunk = ref terrainChunks[0];
 
-                Dirty = false;
-            }
+            if (chunk.VertexIndexBuffer is null) return;
 
-            vertexIndexBuffer.Bind();
+            chunk.VertexIndexBuffer.Bind();
 
-            // pass 1, render to a picking texture
-            pickingBuffer.TestPosition = new((int)gameState.MousePosition.X, gameState.WindowSize.Y - (int)gameState.MousePosition.Y);
-            pickingBuffer.Bind();
-            GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
-            GL.DrawArrays(PrimitiveType.Triangles, 0, vertexIndexBuffer.VertexCount);
-            pickingBuffer.UnbindAndProcess();
-
-            // pass 2, render the terrain 
-            terrainShader.ProgramUniform("selectedPrimitiveID", pickingBuffer.SelectedPrimitiveID);
+            // pass 1, render the terrain 
+            terrainShader.ProgramUniform("selectedPrimitiveID", selectedPrimitiveId);
             terrainShader.Use();
             roadsTexture.Bind();
-            GL.DrawArrays(PrimitiveType.Triangles, 0, vertexIndexBuffer.VertexCount);
+            GL.DrawArrays(PrimitiveType.Triangles, 0, chunk.VertexIndexBuffer.VertexCount);
 
             // pass 3, render the grid
             gridShader.Use();
-            GL.DrawElements(BeginMode.Lines, vertexIndexBuffer.IndexCount, DrawElementsType.UnsignedShort, 0);
+            GL.DrawElements(BeginMode.Lines, chunk.VertexIndexBuffer.IndexCount, DrawElementsType.UnsignedShort, 0);
 
             // return the picked cell information
-            SelectedCell = pickingBuffer.SelectedPrimitiveID == 0 ? NoSelectedCell
-                : new Vector2((pickingBuffer.SelectedPrimitiveID - 1) / 2 / (chunkSize - 1), (pickingBuffer.SelectedPrimitiveID - 1) / 2 % (chunkSize - 1)) + pickingBuffer.SelectedPrimitiveUV;
+            //SelectedCell = pickingBuffer.SelectedPrimitiveID == 0 ? NoSelectedCell
+            //    : new Vector2((pickingBuffer.SelectedPrimitiveID - 1) / 2 / (chunkSize - 1), (pickingBuffer.SelectedPrimitiveID - 1) / 2 % (chunkSize - 1)) + pickingBuffer.SelectedPrimitiveUV;
         }
 
         void Dispose(bool disposing)
@@ -221,8 +300,9 @@ namespace ct3d.WorldPrimitives
                 // unmanaged objects
                 terrainShader.Dispose();
                 gridShader.Dispose();
-                vertexIndexBuffer?.Dispose();
-                pickingBuffer.Dispose();
+                for (int idx = 0; idx < terrainChunks.Length; ++idx)
+                    terrainChunks[idx].VertexIndexBuffer.Dispose();
+                //pickingBuffer.Dispose();
                 roadsTexture.Dispose();
 
                 disposedValue = true;

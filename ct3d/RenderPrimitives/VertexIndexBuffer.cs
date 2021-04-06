@@ -1,11 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Numerics;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
 using OpenTK.Graphics.OpenGL4;
-using OpenTK.Mathematics;
 
 namespace ct3d.RenderPrimitives
 {
@@ -26,7 +26,6 @@ namespace ct3d.RenderPrimitives
             [typeof(Vector2)] = VertexAttribType.Float,
             [typeof(Vector3)] = VertexAttribType.Float,
             [typeof(Vector4)] = VertexAttribType.Float,
-            [typeof(Color4)] = VertexAttribType.Float,
             [typeof(int)] = VertexAttribType.Int,
             [typeof(uint)] = VertexAttribType.UnsignedInt,
         };
@@ -36,7 +35,6 @@ namespace ct3d.RenderPrimitives
             [typeof(Vector2)] = 2,
             [typeof(Vector3)] = 3,
             [typeof(Vector4)] = 4,
-            [typeof(Color4)] = 4,
             [typeof(int)] = 1,
             [typeof(uint)] = 1,
         };
