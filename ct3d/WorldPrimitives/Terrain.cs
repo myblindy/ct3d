@@ -229,8 +229,9 @@ namespace ct3d.WorldPrimitives
                 var normalizedScreenMousePosition = new Vector4(gameState.MousePosition.X / gameState.WindowSize.X * 2 - 1, -(gameState.MousePosition.Y / gameState.WindowSize.Y * 2 - 1), 1f, 1f);
                 if (!Matrix4x4.Invert(gameState.ProjectionWorldUniformBufferObject.Value.View * gameState.ProjectionWorldUniformBufferObject.Value.Projection, out var invertedProjectionViewTransform))
                     throw new InvalidOperationException();
-                var screenMousePosition = Vector4.Transform(normalizedScreenMousePosition, invertedProjectionViewTransform);
+                var screenMousePosition = Vector4.Transform(normalizedScreenMousePosition, Matrix4x4.Transpose(invertedProjectionViewTransform));
                 var cameraDirection = Vector3.Normalize(new Vector3(screenMousePosition.X, screenMousePosition.Y, screenMousePosition.Z));
+                var cameraTarget = cameraOrigin + cameraDirection;
 
                 for (int chunkIdx = 0; chunkIdx < terrainChunks.Length; ++chunkIdx)
                 {
@@ -256,8 +257,7 @@ namespace ct3d.WorldPrimitives
                         if (v < 0 || u + v > 1) continue;       // outside
 
                         // inside at position u,v
-                        (SelectedCell, found) = (new(tri.A.X + u, tri.A.X + v), true);
-                        selectedPrimitiveId = triIdx & ~1U;
+                        (SelectedCell, found, selectedPrimitiveId) = (new(tri.A.X + u, tri.A.X + v), true, triIdx & ~1U);
                         break;
                     }
                 }
